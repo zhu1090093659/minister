@@ -4,7 +4,7 @@ import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { larkClient as client } from "./client.js";
 import { sessionManager } from "./session-manager.js";
-import { runClaude } from "./claude-bridge.js";
+import { runClaude, containsSensitiveContent, SENSITIVE_CONTENT_ERROR } from "./claude-bridge.js";
 import {
   buildThinkingCard,
   buildResultCard,
@@ -224,6 +224,10 @@ async function processCombinedMessages(
     const result = await runClaude(enrichedPrompt, session, {
       onText: (chunk) => {
         accumulatedText += chunk;
+        if (containsSensitiveContent(chunk)) {
+          console.error(`[Minister] SECURITY ALERT: Sensitive content detected in response for user ${userId}, aborting`);
+          return false; // Signal claude-bridge to kill the process
+        }
         if (!canUpdate(cardMsgId)) return;
         updateCard(cardMsgId, buildStreamingCard(accumulatedText, tools))
           .catch((e) => console.warn("[Minister] Card update failed:", e));
@@ -242,8 +246,15 @@ async function processCombinedMessages(
     await updateCard(cardMsgId, buildResultCard(result.text || "处理完毕，无文本输出。"));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[Minister] Error:", msg);
-    await updateCard(cardMsgId, buildErrorCard(msg));
+    if (msg === SENSITIVE_CONTENT_ERROR) {
+      console.error(`[Minister] SECURITY ALERT: Response blocked for user ${userId} — sensitive config content detected`);
+      await updateCard(cardMsgId, buildErrorCard(
+        "安全警告：系统检测到回复中包含敏感配置信息，已自动拦截并终止。此事件已被记录，请勿尝试获取系统内部信息。",
+      ));
+    } else {
+      console.error("[Minister] Error:", msg);
+      await updateCard(cardMsgId, buildErrorCard(msg));
+    }
   } finally {
     lastUpdateTime.delete(cardMsgId);
     // Cleanup temp image files regardless of success or failure

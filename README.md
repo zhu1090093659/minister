@@ -1,5 +1,15 @@
 # 丞相 / Minister
 
+<div align="center">
+
+<video src="resource/minister-intro.mp4" width="720" controls>
+  Your browser does not support the video tag.
+</video>
+
+*[点击此处观看介绍视频](resource/minister-intro.mp4)*
+
+</div>
+
 > 把 Claude Code 塞进飞书，给你的团队加一个全能同事。
 
 **[English](./README_EN.md)**

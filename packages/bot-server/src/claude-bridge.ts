@@ -14,10 +14,27 @@ const PROJECT_ROOT = resolve(__dirname, "../../..");
 const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 interface BridgeCallbacks {
-  onText?: (text: string) => void;
+  // Return false to abort the Claude process immediately
+  onText?: (text: string) => boolean | void;
   onToolUse?: (toolName: string) => void;
   onError?: (error: string) => void;
 }
+
+// Patterns that indicate sensitive config/credential content in a response
+const SENSITIVE_PATTERNS: RegExp[] = [
+  /\bFEISHU_APP_SECRET\s*[:=]\s*\S{4,}/i,
+  /\bANTHROPIC_API_KEY\s*[:=]\s*\S{4,}/i,
+  /\bFEISHU_APP_ID\s*[:=]\s*cli_\S+/i,
+  /\bsk-ant-[A-Za-z0-9\-_]{20,}/,
+  // Generic env-var-like line: UPPER_CASE=longvalue (matches .env file content)
+  /^[A-Z][A-Z0-9_]{4,}=\S{16,}$/m,
+];
+
+export function containsSensitiveContent(text: string): boolean {
+  return SENSITIVE_PATTERNS.some((p) => p.test(text));
+}
+
+export const SENSITIVE_CONTENT_ERROR = "SENSITIVE_CONTENT_DETECTED";
 
 interface BridgeResult {
   text: string;
@@ -137,6 +154,15 @@ export async function runClaude(
     const tools: string[] = [];
     let sessionId: string | undefined;
     let buffer = "";
+    let settled = false;
+
+    function abort(reason: Error): void {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      proc.kill("SIGTERM");
+      reject(reason);
+    }
 
     // Extract result event fields (used in both streaming and close handlers)
     function applyResultEvent(event: { session_id?: string; result?: string }) {
@@ -164,7 +190,11 @@ export async function runClaude(
               for (const block of contentBlocks) {
                 if (block.type === "text" && block.text) {
                   fullText += block.text;
-                  callbacks.onText?.(block.text);
+                  const abortSignal = callbacks.onText?.(block.text);
+                  if (abortSignal === false) {
+                    abort(new Error(SENSITIVE_CONTENT_ERROR));
+                    return;
+                  }
                 } else if (block.type === "tool_use") {
                   const toolName = block.name || "unknown";
                   tools.push(toolName);
@@ -193,11 +223,12 @@ export async function runClaude(
 
     // Kill process if it runs too long
     const timeoutId = setTimeout(() => {
-      proc.kill("SIGTERM");
-      reject(new Error(`Claude CLI timed out after ${CLAUDE_TIMEOUT_MS / 60_000} minutes`));
+      abort(new Error(`Claude CLI timed out after ${CLAUDE_TIMEOUT_MS / 60_000} minutes`));
     }, CLAUDE_TIMEOUT_MS);
 
     proc.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeoutId);
       console.log(`[Claude] Process exited with code ${code}, fullText length: ${fullText.length}`);
       // Process remaining buffer
@@ -222,8 +253,7 @@ export async function runClaude(
     });
 
     proc.on("error", (err) => {
-      clearTimeout(timeoutId);
-      reject(err);
+      abort(err);
     });
   });
 }
