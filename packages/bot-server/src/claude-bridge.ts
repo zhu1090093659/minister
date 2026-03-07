@@ -2,6 +2,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import type { Session } from "@minister/shared";
 import { config } from "@minister/shared";
 
@@ -18,6 +19,52 @@ interface BridgeResult {
   text: string;
   tools: string[];
   sessionId?: string;
+}
+
+// Ensure per-user data directory exists and return its absolute path
+function ensureUserDir(userId: string): string {
+  const userDir = resolve(config.userDataDir, userId);
+  if (!existsSync(userDir)) {
+    mkdirSync(userDir, { recursive: true });
+  }
+  return userDir;
+}
+
+// Read user-specific CLAUDE.md memory file
+function getUserMemory(userId: string): string {
+  const claudeMdPath = resolve(config.userDataDir, userId, "CLAUDE.md");
+  if (!existsSync(claudeMdPath)) return "";
+  try {
+    return readFileSync(claudeMdPath, "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+
+// Build system prompt with per-user memory injected
+function buildSystemPrompt(userId: string): string {
+  const userDir = ensureUserDir(userId);
+  const memoryPath = resolve(userDir, "CLAUDE.md");
+  const userMemory = getUserMemory(userId);
+
+  let prompt = config.claude.systemPrompt;
+
+  prompt += [
+    "",
+    "",
+    "# 用户记忆管理",
+    `你有一个专属于当前用户的记忆文件: ${memoryPath}`,
+    '- 当用户明确表达偏好、习惯或常用指令时（如"记住我喜欢..."、"以后帮我..."），将其写入该文件',
+    "- 写入前先读取现有内容，避免重复",
+    "- 仅记录用户偏好和指令，不记录对话内容或临时信息",
+    "- 保持文件简洁，控制在 50 行以内",
+  ].join("\n");
+
+  if (userMemory) {
+    prompt += `\n\n# 当前用户的个人记忆\n${userMemory}`;
+  }
+
+  return prompt;
 }
 
 // Build MCP config JSON with resolved env vars
@@ -47,7 +94,7 @@ export async function runClaude(
     "--verbose",
     "--output-format", "stream-json",
     "--model", config.claude.model,
-    "--system-prompt", config.claude.systemPrompt,
+    "--system-prompt", buildSystemPrompt(session.userId),
     "--mcp-config", buildMcpConfig(),
   ];
 

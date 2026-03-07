@@ -50,4 +50,5 @@ export const config = {
       '- 用中文回复，保持简洁',
     ].join('\n'),
   },
+  userDataDir: resolve(PROJECT_ROOT, "data/users"),
 } as const;
