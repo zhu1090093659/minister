@@ -37,5 +37,6 @@ export const config = {
   },
   claude: {
     model: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
+    verbose: process.env.CLAUDE_VERBOSE === "true",
   },
 } as const;

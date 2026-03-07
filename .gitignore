@@ -9,3 +9,4 @@ dist/
 .env.local
 config/claude.env
 *.log
+.claude/settings.local.json

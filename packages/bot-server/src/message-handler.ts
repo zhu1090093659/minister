@@ -5,9 +5,13 @@ import { runClaude } from "./claude-bridge.js";
 import {
   buildThinkingCard,
   buildResultCard,
-  buildProgressCard,
+  buildStreamingCard,
+  buildToolUseCard,
   buildErrorCard,
 } from "./card-builder.js";
+
+// Deduplicate events delivered more than once by Feishu SDK
+const processedMessages = new Set<string>();
 
 // Throttle card updates to avoid Feishu rate limits (>= 1.5s between updates)
 const MIN_UPDATE_INTERVAL = 1500;
@@ -34,7 +38,6 @@ async function sendCard(chatId: string, cardJson: string): Promise<string | unde
 }
 
 async function updateCard(messageId: string, cardJson: string): Promise<void> {
-  if (!canUpdate(messageId)) return;
   await client.im.v1.message.patch({
     path: { message_id: messageId },
     data: { content: cardJson },
@@ -71,6 +74,11 @@ export async function handleMessage(data: {
 }): Promise<void> {
   const { sender, message } = data;
 
+  // Deduplicate: skip if already processed
+  if (processedMessages.has(message.message_id)) return;
+  processedMessages.add(message.message_id);
+  setTimeout(() => processedMessages.delete(message.message_id), 60_000);
+
   // Only handle text messages
   if (message.message_type !== "text") return;
 
@@ -97,44 +105,43 @@ export async function handleMessage(data: {
   // Get or create session for this user
   const session = sessionManager.getOrCreate(userId, message.chat_id);
 
+  console.log(`[Minister] Received message from ${userId}: "${text.slice(0, 50)}"`);
+
   // Send "thinking" card
   const cardMsgId = await sendCard(message.chat_id, buildThinkingCard());
-  if (!cardMsgId) return;
+  if (!cardMsgId) {
+    console.error("[Minister] Failed to send thinking card");
+    return;
+  }
+  console.log(`[Minister] Thinking card sent: ${cardMsgId}`);
 
   try {
     const tools: string[] = [];
+    let accumulatedText = "";
 
     const result = await runClaude(text, session, {
       onText: (chunk) => {
-        // Stream partial text to card
-        updateCard(
-          cardMsgId,
-          buildProgressCard({
-            title: "Minister is thinking...",
-            content: chunk,
-            tools,
-            status: "Processing...",
-          }),
-        ).catch((e) => console.warn("[Minister] Card update failed:", e));
+        accumulatedText += chunk;
+        if (!canUpdate(cardMsgId)) return;
+        updateCard(cardMsgId, buildStreamingCard(accumulatedText, tools))
+          .catch((e) => console.warn("[Minister] Card update failed:", e));
       },
       onToolUse: (toolName) => {
         tools.push(toolName);
-        updateCard(
-          cardMsgId,
-          buildProgressCard({
-            title: "Minister is working...",
-            content: "Calling tools...",
-            tools,
-            status: `Using: ${toolName}`,
-          }),
-        ).catch((e) => console.warn("[Minister] Card update failed:", e));
+        if (!canUpdate(cardMsgId)) return;
+        updateCard(cardMsgId, buildToolUseCard(accumulatedText, tools, toolName))
+          .catch((e) => console.warn("[Minister] Card update failed:", e));
       },
     });
 
+    console.log(`[Minister] Claude done. Text length: ${result.text.length}, tools: ${result.tools.length}, sessionId: ${result.sessionId}`);
+
     // Final result card
-    await updateCard(cardMsgId, buildResultCard(result.text || "Done. No text output."));
+    await updateCard(cardMsgId, buildResultCard(result.text || "处理完毕，无文本输出。"));
+    console.log(`[Minister] Result card updated`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[Minister] Error:`, msg);
     await updateCard(cardMsgId, buildErrorCard(msg));
   } finally {
     lastUpdateTime.delete(cardMsgId);

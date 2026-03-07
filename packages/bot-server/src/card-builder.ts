@@ -53,27 +53,45 @@ export function buildProgressCard(opts: CardOptions): string {
 
 export function buildThinkingCard(): string {
   return buildProgressCard({
-    title: "Minister is thinking...",
-    content: "Analyzing your request...",
-    status: "Thinking...",
+    title: "丞相正在思考...",
+    content: "正在分析您的请求...",
+    status: "思考中...",
     headerColor: "blue",
   });
 }
 
 export function buildResultCard(content: string): string {
   return buildProgressCard({
-    title: "Minister",
+    title: "丞相",
     content,
-    status: "Done",
+    status: "处理完毕",
     headerColor: "green",
+  });
+}
+
+export function buildStreamingCard(content: string, tools: string[]): string {
+  return buildProgressCard({
+    title: "丞相正在思考...",
+    content,
+    tools,
+    status: "处理中...",
+  });
+}
+
+export function buildToolUseCard(content: string, tools: string[], toolName: string): string {
+  return buildProgressCard({
+    title: "丞相正在工作...",
+    content: content || "正在调用工具...",
+    tools,
+    status: `正在使用: ${toolName}`,
   });
 }
 
 export function buildErrorCard(error: string): string {
   return buildProgressCard({
-    title: "Minister - Error",
+    title: "丞相 - 出错了",
     content: error,
-    status: "Failed",
+    status: "处理失败",
     headerColor: "red",
   });
 }
