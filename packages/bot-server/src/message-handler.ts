@@ -2,7 +2,7 @@
 import { resolve } from "node:path";
 import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { larkClient as client } from "./client.js";
+import { larkClient as client, botOpenId } from "./client.js";
 import { sessionManager } from "./session-manager.js";
 import { runClaude, containsSensitiveContent, SENSITIVE_CONTENT_ERROR } from "./claude-bridge.js";
 import {
@@ -293,8 +293,12 @@ export async function handleMessage(data: {
 
   if (!SUPPORTED_TYPES.has(message.message_type)) return;
 
-  // In group chat, only respond when @mentioned
-  if (message.chat_type === "group" && !message.mentions?.length) return;
+  // In group chat, only respond when the bot itself is @mentioned
+  if (message.chat_type === "group") {
+    if (!message.mentions?.length) return;
+    const myOpenId = await botOpenId;
+    if (!myOpenId || !message.mentions.some((m) => m.id.open_id === myOpenId)) return;
+  }
 
   const userId = sender.sender_id.open_id || sender.sender_id.user_id || "unknown";
 
