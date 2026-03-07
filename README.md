@@ -1,8 +1,14 @@
 # Minister / 丞相
 
-AI-driven Feishu chatbot framework powered by Claude — your intelligent assistant that lives inside Feishu.
+> 把 Claude Code 塞进飞书，给你的团队加一个全能同事。
 
-基于 Claude 驱动的飞书 AI 聊天机器人框架，一个住在飞书里的智能助手。
+丞相是一个基于 Claude Code 的飞书 AI 助手框架，为企业团队打造。它不是又一个聊天机器人——它是一个住在飞书里的同事，能直接帮你发消息、建任务、写文档、排日程、操作多维表格，说完就办，不用你再动手。
+
+十人团队用它分担杂活，一人公司拿它当全能搭档，都合适。
+
+丞相为每位同事维护专属记忆。你说过"我的周报喜欢分三段写"，它就记住了，下次直接照做。张三的习惯是张三的，李四的偏好是李四的，互不干扰。会话断了、服务重启了，记忆都还在。
+
+底层，丞相通过 MCP 协议将飞书 API 暴露给 Claude Code，让 AI 拥有真正的执行力而不只是生成文本。整个项目用 TypeScript 写成，Bun 驱动，Docker 一键部署。
 
 ---
 
@@ -14,9 +20,13 @@ AI-driven Feishu chatbot framework powered by Claude — your intelligent assist
 
 ### What is Minister?
 
-Minister is a TypeScript monorepo that connects Claude AI to Feishu (Lark) instant messaging. It listens for messages via WebSocket, routes them to Claude CLI for processing, and streams the results back as interactive Feishu cards.
+Minister is a Feishu AI assistant framework built on Claude Code, designed for teams. It's not another chatbot — it's a colleague that lives inside Feishu, capable of sending messages, creating tasks, writing documents, scheduling events, and operating Bitable on your behalf. You say it, it does it.
 
-On top of chat, Minister exposes a set of Feishu API tools through MCP (Model Context Protocol), allowing Claude to take actions directly in your workspace — send messages, create tasks, manage documents, query calendars, and more.
+Works for a ten-person team splitting the busywork, or a solo founder who needs a capable partner. Either way, it fits.
+
+Minister maintains dedicated memory for each team member. Tell it "I like my weekly reports in three sections", and it remembers — just for you. Everyone's preferences stay separate, persisting across sessions and restarts.
+
+Under the hood, Minister exposes Feishu APIs to Claude Code via MCP (Model Context Protocol), giving the AI real execution power beyond text generation. Written in TypeScript, powered by Bun, deployable with a single Docker command.
 
 ### Architecture
 
@@ -123,9 +133,9 @@ The Docker image is built on `oven/bun:1-debian`, with Claude CLI installed at b
 
 ### Minister 是什么?
 
-Minister（丞相）是一个 TypeScript 单体仓库项目，它将 Claude AI 连接到飞书即时通讯平台。通过 WebSocket 长连接监听飞书消息，将消息路由到 Claude CLI 进行处理，然后以交互式飞书卡片的形式实时回传结果。
+丞相是一个开源的飞书 AI 助手框架。你在飞书群里或私聊中 @ 它，背后的 Claude 会理解你的意图并直接行动：帮你发消息、建任务、写文档、排日程、查多维表格。不是给你一段文字让你自己去操作，而是它替你把事情办了。
 
-除了对话能力，Minister 还通过 MCP（模型上下文协议）暴露了一整套飞书 API 工具，让 Claude 能够直接在你的工作空间中执行操作——发消息、建任务、管文档、查日历，一应俱全。
+技术层面，丞相通过 MCP 协议将飞书 API 暴露给 Claude，WebSocket 长连接接收消息，流式卡片实时展示处理进度。整个项目用 TypeScript 单体仓库组织，Bun 驱动，Docker 一键部署。
 
 ### 项目结构
 
