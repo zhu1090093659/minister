@@ -128,9 +128,9 @@ export async function handleTaskTool(
 
       // Optionally add to tasklist
       if (taskId && args.tasklist_id) {
-        await larkClient.task.v2.tasklistActivitySubscription.create({
-          path: { tasklist_guid: args.tasklist_id as string },
-          data: { resource_type: "task", resource_id: taskId },
+        await larkClient.task.v2.task.addTasklist({
+          path: { task_guid: taskId },
+          data: { tasklist_guid: args.tasklist_id as string },
         });
       }
 
