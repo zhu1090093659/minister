@@ -44,7 +44,7 @@ export async function runClaude(
   const args = [
     "--print",
     "--permission-mode", "auto",
-    ...(config.claude.verbose ? ["--verbose"] : []),
+    "--verbose",
     "--output-format", "stream-json",
     "--model", config.claude.model,
     "--system-prompt", config.claude.systemPrompt,
@@ -55,7 +55,9 @@ export async function runClaude(
     args.push("--resume", session.conversationId);
   }
 
-  args.push(prompt);
+  // "--" separates options from positional args;
+  // without it, --mcp-config (variadic) swallows the prompt
+  args.push("--", prompt);
 
   console.log(`[Claude] Spawning: claude ${args.join(" ").slice(0, 100)}...`);
 

@@ -37,7 +37,6 @@ export const config = {
   },
   claude: {
     model: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
-    verbose: process.env.CLAUDE_VERBOSE === "true",
     systemPrompt: process.env.CLAUDE_SYSTEM_PROMPT || [
       '你是"丞相"，一个飞书智能助手机器人。你通过MCP工具直接操作飞书来帮助用户完成任务。',
       '',

@@ -119,7 +119,7 @@ export async function handleTaskTool(
             role: m.role || "assignee",
           })),
           origin: {
-            platform_i18n_name: '{"zh_cn": "丞相AI", "en_us": "Minister AI"}',
+            platform_i18n_name: { zh_cn: "丞相AI", en_us: "Minister AI" },
           },
         },
       });

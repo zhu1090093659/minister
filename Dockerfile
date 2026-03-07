@@ -11,7 +11,10 @@ RUN bun install --frozen-lockfile --production
 # Stage 2: Final runtime image
 FROM oven/bun:1-debian
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl bash ca-certificates \
+ARG APT_MIRROR=deb.debian.org
+RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/*.sources 2>/dev/null; \
+    sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list 2>/dev/null; \
+    apt-get update && apt-get install -y --no-install-recommends curl bash ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude CLI (native binary)
