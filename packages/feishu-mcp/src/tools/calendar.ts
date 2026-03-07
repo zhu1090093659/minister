@@ -21,6 +21,10 @@ export const calendarToolDefs = [
           type: "string",
           description: "End time (Unix timestamp in seconds or ISO string)",
         },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used to find their primary calendar",
+        },
         attendees: {
           type: "array",
           items: {
@@ -98,40 +102,59 @@ export async function handleCalendarTool(
 ): Promise<ToolResult> {
   switch (name) {
     case "cal_create_event": {
-      const calendarId = "primary";
-      const attendees = args.attendees as
+      const userOpenId = args.user_open_id as string | undefined;
+      const extraAttendees = args.attendees as
         | Array<{ type?: string; user_id?: string; chat_id?: string }>
         | undefined;
+
+      const startTs = toUnixSeconds(args.start_time as string);
+      const endTs = toUnixSeconds(args.end_time as string);
+
+      // Find a usable calendar (app has no "primary"; pick first owned/writable)
+      let calendarId = "primary";
+      const calList = await larkClient.calendar.v4.calendar.list({});
+      const cals = calList.data?.calendar_list;
+      if (cals?.length) {
+        const owned = cals.find((c) => c.role === "owner");
+        const writable = cals.find((c) => c.role === "writer");
+        calendarId = (owned || writable || cals[0]).calendar_id!;
+      }
 
       const res = await larkClient.calendar.v4.calendarEvent.create({
         path: { calendar_id: calendarId },
         data: {
           summary: args.summary as string,
           description: (args.description as string) || undefined,
-          start_time: {
-            timestamp: toUnixSeconds(args.start_time as string),
-          },
-          end_time: {
-            timestamp: toUnixSeconds(args.end_time as string),
-          },
+          start_time: { timestamp: startTs },
+          end_time: { timestamp: endTs },
           attendee_ability: "can_modify_event",
         },
       });
 
       const eventId = res.data?.event?.event_id;
 
-      // Add attendees if specified
-      if (eventId && attendees?.length) {
-        await larkClient.calendar.v4.calendarEventAttendee.create({
-          path: { calendar_id: calendarId, event_id: eventId },
-          data: {
-            attendees: attendees.map((a) => ({
+      // Add requesting user and extra attendees
+      if (eventId) {
+        const allAttendees: Array<{ type: "user" | "chat" | "resource"; user_id?: string; chat_id?: string }> = [];
+        if (userOpenId) {
+          allAttendees.push({ type: "user", user_id: userOpenId });
+        }
+        if (extraAttendees?.length) {
+          for (const a of extraAttendees) {
+            allAttendees.push({
               type: (a.type as "user" | "chat" | "resource") || "user",
               user_id: a.user_id,
               chat_id: a.chat_id,
-            })),
-          },
-        });
+            });
+          }
+        }
+        if (allAttendees.length > 0) {
+          await larkClient.calendar.v4.calendarEventAttendee.create({
+            path: { calendar_id: calendarId, event_id: eventId },
+            params: { user_id_type: "open_id" },
+            data: { attendees: allAttendees },
+          });
+        }
       }
 
       return {

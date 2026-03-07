@@ -43,6 +43,10 @@ export const taskToolDefs = [
           type: "string",
           description: "Tasklist ID to add this task into",
         },
+        creator_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, auto-added as assignee",
+        },
       },
       required: ["summary"],
     },
@@ -108,20 +112,30 @@ export async function handleTaskTool(
         | undefined;
       const due = args.due ? toUnixSeconds(args.due as string) : undefined;
 
+      // Merge creator as assignee if provided and not already in members
+      const allMembers = [...(members || [])];
+      const creatorId = args.creator_open_id as string | undefined;
+      if (creatorId && !allMembers.some((m) => m.id === creatorId)) {
+        allMembers.push({ id: creatorId, id_type: "open_id", role: "assignee" });
+      }
+
       const res = await larkClient.task.v2.task.create({
         data: {
           summary: args.summary as string,
           description: (args.description as string) || undefined,
           due: due ? { timestamp: due, is_all_day: false } : undefined,
-          members: members?.map((m) => ({
-            id: m.id,
-            type: (m.id_type as "open_id" | "user_id") || "open_id",
-            role: m.role || "assignee",
-          })),
+          members: allMembers.length > 0
+            ? allMembers.map((m) => ({
+                id: m.id,
+                type: "user",
+                role: m.role || "assignee",
+              }))
+            : undefined,
           origin: {
             platform_i18n_name: { zh_cn: "丞相AI", en_us: "Minister AI" },
           },
         },
+        params: { user_id_type: "open_id" },
       });
 
       const taskId = res.data?.task?.guid;
@@ -181,7 +195,8 @@ export async function handleTaskTool(
       const res = await larkClient.task.v2.task.list({
         params: {
           page_size: (args.page_size as number) || 50,
-          completed: args.completed !== undefined ? String(args.completed) : undefined,
+          completed: args.completed as boolean | undefined,
+          user_id_type: "open_id",
         },
       });
       const tasks = (res.data?.items ?? []).map((t) => ({

@@ -15,6 +15,10 @@ export const documentToolDefs = [
           type: "string",
           description: "Folder token to create in (optional)",
         },
+        owner_open_id: {
+          type: "string",
+          description: "User open_id to transfer document ownership to",
+        },
       },
       required: ["title"],
     },
@@ -62,11 +66,25 @@ export async function handleDocumentTool(
         },
       });
       const doc = res.data?.document;
+      const docToken = doc?.document_id;
+
+      // Transfer ownership to the requesting user
+      if (docToken && args.owner_open_id) {
+        await larkClient.drive.v1.permissionMember.transferOwner({
+          path: { token: docToken },
+          params: { type: "docx", need_notification: false },
+          data: {
+            member_type: "openid",
+            member_id: args.owner_open_id as string,
+          },
+        });
+      }
+
       return {
         content: [
           {
             type: "text",
-            text: `Document created. document_id: ${doc?.document_id}, title: ${doc?.title}`,
+            text: `Document created. document_id: ${docToken}, title: ${doc?.title}`,
           },
         ],
       };
@@ -86,7 +104,7 @@ export async function handleDocumentTool(
     case "doc_update": {
       // Create a text block and append to document body
       const content = args.content as string;
-      await larkClient.docx.v1.documentBlock.childrenBatchCreate({
+      await larkClient.docx.v1.documentBlockChildren.create({
         path: {
           document_id: args.document_id as string,
           block_id: args.document_id as string, // root block ID equals document ID
@@ -101,7 +119,6 @@ export async function handleDocumentTool(
                     text_run: { content },
                   },
                 ],
-                style: {},
               },
             },
           ],

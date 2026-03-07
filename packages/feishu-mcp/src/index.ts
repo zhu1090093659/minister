@@ -63,10 +63,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   try {
     return await handler((args ?? {}) as Record<string, unknown>);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+  } catch (err: unknown) {
+    // Dump full error for debugging Feishu API issues
+    let detail: string;
+    try {
+      detail = JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2);
+    } catch {
+      detail = err instanceof Error ? err.message : String(err);
+    }
     return {
-      content: [{ type: "text" as const, text: `Error: ${msg}` }],
+      content: [{ type: "text" as const, text: `Error calling ${name}: ${detail}` }],
       isError: true,
     };
   }

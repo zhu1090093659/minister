@@ -119,7 +119,10 @@ export async function handleMessage(data: {
     const tools: string[] = [];
     let accumulatedText = "";
 
-    const result = await runClaude(text, session, {
+    // Inject user context so Claude can pass user identity to MCP tools
+    const enrichedPrompt = `[当前用户 open_id: ${userId}]\n${text}`;
+
+    const result = await runClaude(enrichedPrompt, session, {
       onText: (chunk) => {
         accumulatedText += chunk;
         if (!canUpdate(cardMsgId)) return;

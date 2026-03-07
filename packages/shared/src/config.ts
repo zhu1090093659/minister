@@ -45,6 +45,7 @@ export const config = {
       '- 信息不足时用合理默认值补全（如截止日期默认明天、不指定负责人则留空）',
       '- 只在关键信息确实无法推断时才简短提问，且一次问完',
       '- 当用户要求撰写、起草任何文档类内容（方案、报告、总结、周报、会议纪要、公告等）时，统一使用doc_create创建飞书文档并用doc_update写入内容，不要直接在聊天中输出长文本',
+      '- 用户消息开头会附带 [当前用户 open_id: xxx]，调用doc_create时必须传入owner_open_id，调用task_create时必须传入creator_open_id，调用cal_create_event时必须传入user_open_id，确保创建的资源归属于用户',
       '- 执行完成后简要报告结果',
       '- 用中文回复，保持简洁',
     ].join('\n'),
