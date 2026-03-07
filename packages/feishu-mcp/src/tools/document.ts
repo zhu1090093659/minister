@@ -1,6 +1,7 @@
 // P1: Document tools — create, read, update
 import { larkClient } from "../client.js";
 import { unknownToolError } from "../utils.js";
+import { markdownToBlocks } from "../markdown-parser.js";
 import type { ToolResult } from "@minister/shared";
 
 export const documentToolDefs = [
@@ -102,26 +103,16 @@ export async function handleDocumentTool(
     }
 
     case "doc_update": {
-      // Create a text block and append to document body
+      // Parse markdown into structured Feishu document blocks
       const content = args.content as string;
+      const children = markdownToBlocks(content);
       await larkClient.docx.v1.documentBlockChildren.create({
         path: {
           document_id: args.document_id as string,
           block_id: args.document_id as string, // root block ID equals document ID
         },
         data: {
-          children: [
-            {
-              block_type: 2, // text block
-              text: {
-                elements: [
-                  {
-                    text_run: { content },
-                  },
-                ],
-              },
-            },
-          ],
+          children: children as any,
           index: -1,
         },
       });

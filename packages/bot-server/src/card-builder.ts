@@ -1,5 +1,24 @@
 // Build Feishu interactive message cards
 
+// Convert standard Markdown to lark_md compatible format.
+// lark_md does not support # headings, > blockquotes, or --- horizontal rules.
+function convertToLarkMd(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => {
+      const heading = line.match(/^(#{1,6})\s+(.+)$/);
+      if (heading) return `**${heading[2].trim()}**`;
+
+      const quote = line.match(/^>\s?(.*)$/);
+      if (quote) return quote[1];
+
+      if (/^[-*_]{3,}\s*$/.test(line)) return "————————";
+
+      return line;
+    })
+    .join("\n");
+}
+
 interface CardOptions {
   title: string;
   content: string;
@@ -15,7 +34,7 @@ export function buildProgressCard(opts: CardOptions): string {
   if (opts.content) {
     elements.push({
       tag: "div",
-      text: { tag: "lark_md", content: opts.content },
+      text: { tag: "lark_md", content: convertToLarkMd(opts.content) },
     });
   }
 
