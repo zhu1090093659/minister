@@ -136,4 +136,4 @@ The Docker image is built on `oven/bun:1-debian`, with Claude CLI installed at b
 
 ## License
 
-MIT
+Licensed under [Apache License 2.0](./LICENSE). Commercial use is permitted, provided that original copyright notices and attribution are retained.
