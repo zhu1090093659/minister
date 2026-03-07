@@ -2,11 +2,7 @@
 
 <div align="center">
 
-<video src="resource/minister-intro.mp4" width="720" controls>
-  Your browser does not support the video tag.
-</video>
-
-*[点击此处观看介绍视频](resource/minister-intro.mp4)*
+https://github.com/zhu1090093659/minister/releases/download/v0.1.0/minister-intro.mp4
 
 </div>
 
