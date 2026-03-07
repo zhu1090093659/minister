@@ -22,6 +22,16 @@ Minister is an open-source Feishu AI assistant framework. Mention it in a group 
 
 Technically, Minister exposes Feishu APIs to Claude via MCP, receives messages over a WebSocket long-connection, and displays real-time progress through streaming cards. The project is organized as a TypeScript monorepo, powered by Bun, and deployable with a single Docker command.
 
+### Why Minister?
+
+| | Minister | OpenClaw | Feishu Built-in AI |
+|---|----------|----------|--------------------|
+| **Feishu tool coverage** | 6 categories, 20 native tools — messaging, tasks, docs, calendar, Bitable, and contacts | Feishu added recently as a new channel; tooling limited to basic messaging | Constrained by platform policies |
+| **Execution model** | Calls Feishu APIs directly — does the work for you | General-purpose task execution, not Feishu-native | Generates text and suggestions; you still have to act on it |
+| **Reasoning engine** | Claude Code CLI — Anthropic's production-grade agentic loop | LLM API + community-built ReAct loop | Conversational text generation, no persistent reasoning loop |
+| **Per-user memory** | Each user gets an isolated `CLAUDE.md`; preferences persist across restarts | Shared memory store with no per-user isolation | Cleared at session end; no persistent memory |
+| **Feishu focus** | Purpose-built for Feishu teams; every detail optimized for the Feishu ecosystem | General-purpose platform; Feishu is one of many supported channels | — |
+
 ### Architecture
 
 ```
