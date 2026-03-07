@@ -2,12 +2,16 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, readFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import type { Session } from "@minister/shared";
 import { config } from "@minister/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "../../..");
+
+// Maximum time allowed for a single Claude CLI invocation
+const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 interface BridgeCallbacks {
   onText?: (text: string) => void;
@@ -23,10 +27,16 @@ interface BridgeResult {
 
 // Ensure per-user data directory exists and return its absolute path
 function ensureUserDir(userId: string): string {
-  const userDir = resolve(config.userDataDir, userId);
-  if (!existsSync(userDir)) {
-    mkdirSync(userDir, { recursive: true });
+  // Guard against path traversal: allow only safe characters found in Feishu IDs
+  if (!/^[\w\-:]{1,200}$/.test(userId)) {
+    throw new Error(`Invalid userId format: ${userId}`);
   }
+  const userDir = resolve(config.userDataDir, userId);
+  // Belt-and-suspenders: ensure resolved path stays inside the data dir
+  if (!userDir.startsWith(config.userDataDir + "/") && userDir !== config.userDataDir) {
+    throw new Error(`userId escapes data directory`);
+  }
+  mkdirSync(userDir, { recursive: true });
   return userDir;
 }
 
@@ -67,9 +77,14 @@ function buildSystemPrompt(userId: string): string {
   return prompt;
 }
 
-// Build MCP config JSON with resolved env vars
-function buildMcpConfig(): string {
-  return JSON.stringify({
+// Silently delete a file — used to clean up temp MCP config on all exit paths
+function cleanupFile(path: string): void {
+  try { unlinkSync(path); } catch { /* already deleted */ }
+}
+
+// Write MCP config to a temp file (mode 0o600) to avoid exposing credentials in process args
+function writeMcpConfigFile(): string {
+  const content = JSON.stringify({
     mcpServers: {
       feishu: {
         command: "bun",
@@ -81,6 +96,9 @@ function buildMcpConfig(): string {
       },
     },
   });
+  const tmpPath = resolve(tmpdir(), `minister-mcp-${process.pid}-${Date.now()}.json`);
+  writeFileSync(tmpPath, content, { mode: 0o600 });
+  return tmpPath;
 }
 
 export async function runClaude(
@@ -88,6 +106,7 @@ export async function runClaude(
   session: Session,
   callbacks: BridgeCallbacks = {},
 ): Promise<BridgeResult> {
+  const mcpConfigPath = writeMcpConfigFile();
   const args = [
     "--print",
     "--permission-mode", "auto",
@@ -95,7 +114,7 @@ export async function runClaude(
     "--output-format", "stream-json",
     "--model", config.claude.model,
     "--system-prompt", buildSystemPrompt(session.userId),
-    "--mcp-config", buildMcpConfig(),
+    "--mcp-config", mcpConfigPath,
   ];
 
   if (session.conversationId) {
@@ -173,7 +192,16 @@ export async function runClaude(
       }
     });
 
+    // Kill process and clean up if it runs too long
+    const timeoutId = setTimeout(() => {
+      proc.kill("SIGTERM");
+      cleanupFile(mcpConfigPath);
+      reject(new Error(`Claude CLI timed out after ${CLAUDE_TIMEOUT_MS / 60_000} minutes`));
+    }, CLAUDE_TIMEOUT_MS);
+
     proc.on("close", (code) => {
+      clearTimeout(timeoutId);
+      cleanupFile(mcpConfigPath);
       console.log(`[Claude] Process exited with code ${code}, fullText length: ${fullText.length}`);
       // Process remaining buffer
       if (buffer.trim()) {
@@ -196,6 +224,10 @@ export async function runClaude(
       resolve({ text: fullText, tools, sessionId });
     });
 
-    proc.on("error", reject);
+    proc.on("error", (err) => {
+      clearTimeout(timeoutId);
+      cleanupFile(mcpConfigPath);
+      reject(err);
+    });
   });
 }

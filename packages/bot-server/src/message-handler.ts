@@ -13,6 +13,22 @@ import {
 // Deduplicate events delivered more than once by Feishu SDK
 const processedMessages = new Set<string>();
 
+// Per-user serial processing queue: prevents concurrent Claude invocations for the same user
+const processingQueues = new Map<string, Promise<void>>();
+
+// Enqueue a task for a given key, ensuring serial execution per key
+function enqueueForUser(key: string, task: () => Promise<void>): Promise<void> {
+  const prev = processingQueues.get(key) ?? Promise.resolve();
+  const next = prev.catch(() => {}).then(task);
+  const queued = next.catch(() => {});
+  processingQueues.set(key, queued);
+  // Remove the entry once the queue drains so the Map doesn't grow unboundedly
+  queued.finally(() => {
+    if (processingQueues.get(key) === queued) processingQueues.delete(key);
+  });
+  return next;
+}
+
 // Throttle card updates to avoid Feishu rate limits (>= 1.5s between updates)
 const MIN_UPDATE_INTERVAL = 1500;
 const lastUpdateTime = new Map<string, number>();
@@ -61,6 +77,9 @@ function extractText(message: { content?: string; mentions?: Array<{ key: string
   }
 }
 
+// Reject messages older than this threshold to prevent re-processing after restart/reconnect
+const MAX_MESSAGE_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function handleMessage(data: {
   sender: { sender_id: { open_id?: string; user_id?: string }; sender_type: string };
   message: {
@@ -68,16 +87,26 @@ export async function handleMessage(data: {
     chat_id: string;
     chat_type: string;
     message_type: string;
+    create_time?: string; // Unix timestamp in ms (string) from Feishu
     content?: string;
     mentions?: Array<{ key: string; id: { open_id?: string }; name: string }>;
   };
 }): Promise<void> {
   const { sender, message } = data;
 
-  // Deduplicate: skip if already processed
+  // Reject stale messages: guards against re-delivery after service restart or WS reconnect
+  if (message.create_time) {
+    const ageMs = Date.now() - Number(message.create_time);
+    if (ageMs > MAX_MESSAGE_AGE_MS) {
+      console.log(`[Minister] Skipping stale message ${message.message_id} (age: ${Math.round(ageMs / 1000)}s)`);
+      return;
+    }
+  }
+
+  // Deduplicate: skip if already processed within this session
   if (processedMessages.has(message.message_id)) return;
   processedMessages.add(message.message_id);
-  setTimeout(() => processedMessages.delete(message.message_id), 60_000);
+  setTimeout(() => processedMessages.delete(message.message_id), 10 * 60_000); // extend TTL to 10 min
 
   // Only handle text messages
   if (message.message_type !== "text") return;
@@ -102,51 +131,54 @@ export async function handleMessage(data: {
     return;
   }
 
-  // Get or create session for this user
-  const session = sessionManager.getOrCreate(userId, message.chat_id);
+  // Serialize per-user processing to prevent concurrent Claude invocations for the same user
+  const queueKey = message.chat_type === "group" ? `${userId}:${message.chat_id}` : userId;
+  return enqueueForUser(queueKey, async () => {
+    const session = sessionManager.getOrCreate(userId, message.chat_id);
 
-  console.log(`[Minister] Received message from ${userId}: "${text.slice(0, 50)}"`);
+    console.log(`[Minister] Received message from ${userId}: "${text.slice(0, 50)}"`);
 
-  // Send "thinking" card
-  const cardMsgId = await sendCard(message.chat_id, buildThinkingCard());
-  if (!cardMsgId) {
-    console.error("[Minister] Failed to send thinking card");
-    return;
-  }
-  console.log(`[Minister] Thinking card sent: ${cardMsgId}`);
+    // Send "thinking" card
+    const cardMsgId = await sendCard(message.chat_id, buildThinkingCard());
+    if (!cardMsgId) {
+      console.error("[Minister] Failed to send thinking card");
+      return;
+    }
+    console.log(`[Minister] Thinking card sent: ${cardMsgId}`);
 
-  try {
-    const tools: string[] = [];
-    let accumulatedText = "";
+    try {
+      const tools: string[] = [];
+      let accumulatedText = "";
 
-    // Inject user context so Claude can pass user identity to MCP tools
-    const enrichedPrompt = `[当前用户 open_id: ${userId}]\n${text}`;
+      // Inject user context so Claude can pass user identity to MCP tools
+      const enrichedPrompt = `[当前用户 open_id: ${userId}]\n${text}`;
 
-    const result = await runClaude(enrichedPrompt, session, {
-      onText: (chunk) => {
-        accumulatedText += chunk;
-        if (!canUpdate(cardMsgId)) return;
-        updateCard(cardMsgId, buildStreamingCard(accumulatedText, tools))
-          .catch((e) => console.warn("[Minister] Card update failed:", e));
-      },
-      onToolUse: (toolName) => {
-        tools.push(toolName);
-        if (!canUpdate(cardMsgId)) return;
-        updateCard(cardMsgId, buildToolUseCard(accumulatedText, tools, toolName))
-          .catch((e) => console.warn("[Minister] Card update failed:", e));
-      },
-    });
+      const result = await runClaude(enrichedPrompt, session, {
+        onText: (chunk) => {
+          accumulatedText += chunk;
+          if (!canUpdate(cardMsgId)) return;
+          updateCard(cardMsgId, buildStreamingCard(accumulatedText, tools))
+            .catch((e) => console.warn("[Minister] Card update failed:", e));
+        },
+        onToolUse: (toolName) => {
+          tools.push(toolName);
+          if (!canUpdate(cardMsgId)) return;
+          updateCard(cardMsgId, buildToolUseCard(accumulatedText, tools, toolName))
+            .catch((e) => console.warn("[Minister] Card update failed:", e));
+        },
+      });
 
-    console.log(`[Minister] Claude done. Text length: ${result.text.length}, tools: ${result.tools.length}, sessionId: ${result.sessionId}`);
+      console.log(`[Minister] Claude done. Text length: ${result.text.length}, tools: ${result.tools.length}, sessionId: ${result.sessionId}`);
 
-    // Final result card
-    await updateCard(cardMsgId, buildResultCard(result.text || "处理完毕，无文本输出。"));
-    console.log(`[Minister] Result card updated`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[Minister] Error:`, msg);
-    await updateCard(cardMsgId, buildErrorCard(msg));
-  } finally {
-    lastUpdateTime.delete(cardMsgId);
-  }
+      // Final result card
+      await updateCard(cardMsgId, buildResultCard(result.text || "处理完毕，无文本输出。"));
+      console.log(`[Minister] Result card updated`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[Minister] Error:`, msg);
+      await updateCard(cardMsgId, buildErrorCard(msg));
+    } finally {
+      lastUpdateTime.delete(cardMsgId);
+    }
+  });
 }
