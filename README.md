@@ -45,9 +45,17 @@ The MCP server provides six tool categories for Claude to interact with Feishu:
 ### Prerequisites
 
 - [Bun](https://bun.sh/) v1.x
-- A Feishu custom app with WebSocket enabled (from [open.feishu.cn](https://open.feishu.cn))
+- A Feishu custom app (from [open.feishu.cn](https://open.feishu.cn))
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed (automatically installed in Docker)
 - An Anthropic API key
+
+### Feishu App Setup
+
+Create a custom app on the [Feishu Open Platform](https://open.feishu.cn), then configure it in the [Events & Callbacks](https://open.feishu.cn/app/cli_a920409767f89bc0/event?tab=event) page:
+
+1. **Subscription mode**: Select "Receive events through persistent connection" (WebSocket). Do NOT use HTTP callback.
+2. **Subscribe to events**: Add `im.message.receive_v1` (Receive messages).
+3. **Permissions**: Grant the API scopes required by the MCP tools (messaging, tasks, contacts, calendar, docs, bitable). A full list is in `config/feishu-permissions.json`.
 
 ### Quick Start
 
@@ -95,7 +103,7 @@ bun run mcp     # Start MCP server (used by Claude CLI internally)
 docker compose up -d
 ```
 
-The Docker image is built on `oven/bun:1-alpine`, with Claude CLI installed at build time. On container startup, `.claude/settings.json` is auto-generated from `config/claude.env` and `.env`, so all Claude Code behavior (API endpoint, model, proxy, permissions, etc.) can be controlled purely through environment variables.
+The Docker image is built on `oven/bun:1-debian`, with Claude CLI installed at build time. On container startup, `.claude/settings.json` is auto-generated from `config/claude.env` and `.env`, so all Claude Code behavior (API endpoint, model, proxy, permissions, etc.) can be controlled purely through environment variables.
 
 ### Tech Stack
 
@@ -142,9 +150,17 @@ MCP 服务提供六大类工具，供 Claude 与飞书进行交互：
 ### 环境要求
 
 - [Bun](https://bun.sh/) v1.x
-- 一个开启了 WebSocket 的飞书自建应用（在 [open.feishu.cn](https://open.feishu.cn) 创建）
+- 一个飞书自建应用（在 [open.feishu.cn](https://open.feishu.cn) 创建）
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code)（Docker 部署时自动安装）
 - Anthropic API Key
+
+### 飞书应用配置
+
+在[飞书开放平台](https://open.feishu.cn)创建自建应用后，进入[事件与回调](https://open.feishu.cn/app/cli_a920409767f89bc0/event?tab=event)页面完成以下配置：
+
+1. **订阅方式**：选择"使用长连接接收事件"（WebSocket），不要使用 HTTP 回调。
+2. **事件订阅**：添加 `im.message.receive_v1`（接收消息）。
+3. **权限管理**：开通 MCP 工具所需的 API 权限（消息、任务、通讯录、日历、文档、多维表格等）。完整权限清单见 `config/feishu-permissions.json`。
 
 ### 快速开始
 
@@ -192,7 +208,7 @@ bun run mcp     # 启动 MCP 服务（由 Claude CLI 内部调用）
 docker compose up -d
 ```
 
-Docker 镜像基于 `oven/bun:1-alpine` 构建，Claude CLI 在构建阶段自动安装。容器启动时会自动从 `config/claude.env` 和 `.env` 生成 `.claude/settings.json`，因此 Claude Code 的所有行为（API 端点、模型、代理、权限等）都可以通过环境变量控制。
+Docker 镜像基于 `oven/bun:1-debian` 构建，Claude CLI 在构建阶段自动安装。容器启动时会自动从 `config/claude.env` 和 `.env` 生成 `.claude/settings.json`，因此 Claude Code 的所有行为（API 端点、模型、代理、权限等）都可以通过环境变量控制。
 
 ### 技术栈
 

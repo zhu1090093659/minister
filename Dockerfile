@@ -1,5 +1,5 @@
 # Stage 1: Install production dependencies only
-FROM oven/bun:1-alpine AS deps
+FROM oven/bun:1-debian AS deps
 
 WORKDIR /app
 COPY package.json bun.lock ./
@@ -9,21 +9,19 @@ COPY packages/feishu-mcp/package.json packages/feishu-mcp/
 RUN bun install --frozen-lockfile --production
 
 # Stage 2: Final runtime image
-FROM oven/bun:1-alpine
+FROM oven/bun:1-debian
 
-RUN apk add --no-cache curl bash libgcc libstdc++
+RUN apt-get update && apt-get install -y --no-install-recommends curl bash ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Claude CLI (native binary, no Node.js needed)
-RUN curl -fsSL https://claude.ai/install.sh | bash \
-    && ln -s /root/.claude/local/claude /usr/local/bin/claude
+# Install Claude CLI (native binary)
+ENV PATH="/root/.local/bin:${PATH}"
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 WORKDIR /app
 
-# Copy installed dependencies
+# Copy installed dependencies (bun hoists all deps to root node_modules)
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/packages/bot-server/node_modules ./packages/bot-server/node_modules
-COPY --from=deps /app/packages/feishu-mcp/node_modules ./packages/feishu-mcp/node_modules
 
 # Copy source code and config
 COPY package.json ./
