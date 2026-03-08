@@ -12,10 +12,15 @@ RUN bun install --frozen-lockfile --production
 FROM oven/bun:1-debian
 
 ARG APT_MIRROR=deb.debian.org
+# Bootstrap: mirror may redirect HTTP→HTTPS; disable SSL verify until ca-certificates is installed
 RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/*.sources 2>/dev/null; \
     sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list 2>/dev/null; \
-    apt-get update && apt-get install -y --no-install-recommends curl bash ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    printf 'Acquire { https::Verify-Peer false; https::Verify-Host false; };\n' \
+        > /etc/apt/apt.conf.d/99bootstrap-insecure; \
+    apt-get update && \
+    apt-get install -y --no-install-recommends curl bash ca-certificates && \
+    rm /etc/apt/apt.conf.d/99bootstrap-insecure && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Claude CLI (native binary)
 ENV PATH="/root/.local/bin:${PATH}"
