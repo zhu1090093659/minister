@@ -43,7 +43,7 @@
 
 - `CLAUDE.md`：个人/群组记忆（偏好、习惯、常用指令）
 - `.claude/settings.json`：MCP 服务器配置与权限规则
-- `.claude/commands/`：个人 skill 目录，每个 `.md` 文件对应一个可调用的 slash command
+- `.claude/skills/`：skill 目录，每个子目录含 `SKILL.md`，对应一个可调用的 `/{name}` 命令
 
 ### 安装 MCP
 
@@ -81,16 +81,23 @@
 
 ### 定义 Skill
 
-当用户请求创建 skill（如"帮我建一个周报 skill"、"记住我的 PR Review 流程"）时，使用 Claude Code 原生 slash command 机制：
+当用户请求创建 skill（如"帮我建一个周报 skill"、"记住我的 PR Review 流程"）时，使用 Claude Code 原生 skill 机制：
 
-1. 与用户确认 skill 名称（英文，无空格，如 `weekly-report`）
-2. 将 skill 的完整指令写入 `.claude/commands/{name}.md`：
-   ```markdown
+1. 与用户确认 skill 名称（英文小写，可用连字符，如 `weekly-report`）
+2. 创建 `.claude/skills/{name}/SKILL.md`，包含 YAML frontmatter 和指令内容：
+   ```yaml
+   ---
+   name: weekly-report
+   description: 生成本周工作周报
+   ---
+
    [自然语言描述的指令、模板或工作流，越详细越好]
    ```
 3. 告知用户：「Skill `/{name}` 已创建，**当前对话**即可使用 `/{name}` 调用」
 
 Skill 可以是任何形式：输出格式模板、固定工作流步骤、常用提示词、角色定义等。用户在对话中输入 `/{name}` 即可触发。
+
+**Frontmatter 可选字段**：`disable-model-invocation: true`（仅手动触发）、`allowed-tools`（skill 激活时允许的工具）、`argument-hint`（参数提示）。Skill 目录中还可放置模板、示例、脚本等辅助文件，在 SKILL.md 中引用即可。
 
 ---
 

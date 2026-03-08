@@ -17,7 +17,7 @@ const DEFAULT_USER_CLAUDE_MD = `# User Memory
 
 ## Skills
 
-<!-- Personal skills live in .claude/commands/*.md — each file is a slash command the user can invoke with /{name}. -->
+<!-- Personal skills live in .claude/skills/<name>/SKILL.md — each directory is a skill invoked with /{name}. -->
 `;
 
 // Default CLAUDE.md for group chat workspaces — shared by all members of the chat
@@ -35,7 +35,7 @@ const DEFAULT_GROUP_CLAUDE_MD = `# Group Workspace
 
 ## Skills
 
-<!-- Group skills live in .claude/commands/*.md — each file is a slash command invoked with /{name}. -->
+<!-- Group skills live in .claude/skills/<name>/SKILL.md — each directory is a skill invoked with /{name}. -->
 `;
 
 interface UserSettings {
@@ -58,6 +58,64 @@ const USER_SETTINGS: UserSettings = {
   },
 };
 
+// Built-in skill: background knowledge for workspace management (auto-loaded by Claude when relevant)
+const WORKSPACE_GUIDE_SKILL = `---
+name: workspace-guide
+description: Background knowledge for workspace customization — creating skills, installing MCP servers, managing preferences. Auto-loaded when users ask about customization.
+user-invocable: false
+---
+
+# Workspace Management
+
+## Creating Skills for Users
+
+When a user asks to create a skill (e.g. "make me a weekly report skill"), use the Claude Code skill format:
+
+1. Confirm the skill name (lowercase English, hyphens OK, e.g. \`weekly-report\`)
+2. Create \`.claude/skills/{name}/SKILL.md\` with YAML frontmatter:
+
+\`\`\`yaml
+---
+name: {name}
+description: Brief description of what this skill does and when to use it
+---
+
+[Detailed natural-language instructions, templates, or workflows]
+\`\`\`
+
+3. Tell user: "Skill /{name} has been created and is available immediately."
+
+### Frontmatter options
+
+- \`description\`: Helps Claude auto-discover and invoke the skill when relevant
+- \`disable-model-invocation: true\`: Only user can trigger via /{name}, Claude won't auto-invoke
+- \`allowed-tools\`: Tools allowed without per-use permission when skill is active
+- \`argument-hint\`: Autocomplete hint, e.g. \`[issue-number]\`
+
+### Arguments
+
+Use \`$ARGUMENTS\` in SKILL.md content. When user runs \`/fix-issue 123\`, \`$ARGUMENTS\` becomes \`123\`.
+
+### Supporting files
+
+A skill directory can include extra files (templates, examples, scripts). Reference them from SKILL.md.
+
+## Installing MCP Servers
+
+1. Read \`.claude/settings.json\`
+2. Add/update \`mcpServers\` field — **preserve existing \`permissions\` field**
+3. Write back complete JSON
+4. Tell user: "MCP installed. Start a new conversation for it to take effect."
+
+Common servers:
+
+| Service | command | args | env |
+|---------|---------|------|-----|
+| GitHub | npx | ["-y", "@modelcontextprotocol/server-github"] | GITHUB_PERSONAL_ACCESS_TOKEN |
+| Filesystem | npx | ["-y", "@modelcontextprotocol/server-filesystem", "/path"] | — |
+| Fetch | npx | ["-y", "@modelcontextprotocol/server-fetch"] | — |
+`;
+
 // Track initialized users in memory to avoid per-request filesystem stat in the hot path
 const initializedUsers = new Set<string>();
 
@@ -77,8 +135,12 @@ export function ensureUserWorktree(userId: string): string {
   const settingsPath = resolve(worktreePath, ".claude/settings.json");
 
   if (!existsSync(settingsPath)) {
-    // First visit — initialize directory structure
-    mkdirSync(resolve(worktreePath, ".claude/commands"), { recursive: true });
+    // First visit — initialize directory structure (skills dir + default skill)
+    const guideDir = resolve(worktreePath, ".claude/skills/workspace-guide");
+    mkdirSync(guideDir, { recursive: true });
+
+    // Write the built-in workspace-guide skill
+    writeFileSync(resolve(guideDir, "SKILL.md"), WORKSPACE_GUIDE_SKILL, { mode: 0o600 });
 
     // Migrate legacy CLAUDE.md if it exists, otherwise write default template
     const legacyPath = resolve(config.userDataDir, userId, "CLAUDE.md");
