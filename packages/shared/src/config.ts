@@ -1,28 +1,15 @@
 // Load environment variables from .env and config/claude.env at project root
 import { resolve, dirname } from "node:path";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { loadEnvFile } from "./env.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(__dirname, "../../..");
+export const PROJECT_ROOT = resolve(__dirname, "../../..");
 
-function loadEnvFile(filePath: string): void {
-  if (!existsSync(filePath)) return;
-  const content = readFileSync(filePath, "utf-8");
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
-    if (!process.env[key]) process.env[key] = val;
-  }
-}
-
-// Load claude.env first (lower priority), then .env (higher priority, already set keys win)
-loadEnvFile(resolve(PROJECT_ROOT, "config/claude.env"));
+// Load env files — .env first (higher priority), then claude.env for engine-specific defaults
 loadEnvFile(resolve(PROJECT_ROOT, ".env"));
+loadEnvFile(resolve(PROJECT_ROOT, "config/claude.env"));
 
 function required(key: string): string {
   const val = process.env[key];
@@ -34,15 +21,27 @@ function loadPromptFile(filename: string): string {
   return readFileSync(resolve(PROJECT_ROOT, "config", filename), "utf-8").trim();
 }
 
+const VALID_ENGINES = ["claude", "codex"] as const;
+type EngineType = (typeof VALID_ENGINES)[number];
+
+function validateEngine(value: string): EngineType {
+  if (VALID_ENGINES.includes(value as EngineType)) return value as EngineType;
+  throw new Error(`Invalid ENGINE_TYPE: "${value}" (expected: ${VALID_ENGINES.join(", ")})`);
+}
+
 export const config = {
   feishu: {
     appId: required("FEISHU_APP_ID"),
     appSecret: required("FEISHU_APP_SECRET"),
   },
+  engine: validateEngine(process.env.ENGINE_TYPE || "claude"),
+  systemPrompt: process.env.SYSTEM_PROMPT || loadPromptFile("system-prompt.md"),
   claude: {
     model: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
-    systemPrompt: process.env.CLAUDE_SYSTEM_PROMPT || loadPromptFile("system-prompt.md"),
   },
+  // Codex configuration lives in config/config.toml (native TOML format).
+  // No env-based config fields needed here — config.toml is copied directly
+  // to ~/.codex/config.toml by scripts/generate-codex-config.ts at startup.
   userDataDir: resolve(PROJECT_ROOT, "data/users"),
   worktreeDir: resolve(PROJECT_ROOT, "data/worktrees"),
 } as const;

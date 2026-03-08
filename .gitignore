@@ -12,3 +12,4 @@ config/claude.env
 .claude/settings.local.json
 data/users/
 data/worktrees/
+config/config.toml

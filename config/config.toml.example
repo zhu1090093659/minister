@@ -1,0 +1,25 @@
+# =============================================================================
+# Codex CLI Configuration (config.toml)
+# =============================================================================
+# Native Codex config format. Copied to ~/.codex/config.toml at Docker startup
+# when ENGINE_TYPE=codex. See: https://codex.openai.com/docs/cli
+#
+# This file is ONLY used by Codex CLI — Claude Code ignores it entirely.
+# MCP server definitions are appended automatically by the entrypoint script.
+#
+# Copy this to config/config.toml and fill in your values.
+# Set ENGINE_TYPE=codex in .env to activate.
+# OPENAI_API_KEY must also be set in .env.
+
+# -- Simple setup (use default OpenAI endpoint) --
+# model = "gpt-5.2-codex"
+
+# -- Custom provider setup (proxy / compatible endpoint) --
+# model = "minister/gpt-5.4"
+# model_provider = "minister"
+#
+# [model_providers.minister]
+# name = "Minister Proxy"
+# base_url = "https://api.openai.com/v1"
+# env_key = "OPENAI_API_KEY"
+# wire_api = "responses"

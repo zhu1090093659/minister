@@ -4,28 +4,15 @@
 import { resolve, dirname } from "node:path";
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { loadEnvFile } from "../packages/shared/src/env.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "..");
 const SETTINGS_PATH = resolve(PROJECT_ROOT, ".claude/settings.json");
 
-// Load env files (same logic as config.ts, but standalone for pre-boot usage)
-function loadEnvFile(filePath: string): void {
-  if (!existsSync(filePath)) return;
-  const content = readFileSync(filePath, "utf-8");
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
-    if (!process.env[key]) process.env[key] = val;
-  }
-}
-
-loadEnvFile(resolve(PROJECT_ROOT, "config/claude.env"));
+// Load env files — .env first (higher priority), then claude.env for defaults
 loadEnvFile(resolve(PROJECT_ROOT, ".env"));
+loadEnvFile(resolve(PROJECT_ROOT, "config/claude.env"));
 
 // Read existing settings.json as base template
 let settings: Record<string, unknown> = {};

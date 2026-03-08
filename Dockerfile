@@ -26,6 +26,9 @@ RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/*.sources 
 ENV PATH="/root/.local/bin:${PATH}"
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
+# Install Codex CLI (npm global — only used when ENGINE_TYPE=codex)
+RUN bun install -g @openai/codex
+
 WORKDIR /app
 
 # Copy installed dependencies (bun hoists all deps to root node_modules)

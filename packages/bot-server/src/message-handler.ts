@@ -4,7 +4,7 @@ import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { larkClient as client, botOpenId } from "./client.js";
 import { sessionManager } from "./session-manager.js";
-import { runClaude, containsSensitiveContent, SENSITIVE_CONTENT_ERROR } from "./claude-bridge.js";
+import { runEngine, engineName, containsSensitiveContent, SENSITIVE_CONTENT_ERROR } from "./engine-bridge.js";
 import {
   buildThinkingCard,
   buildResultCard,
@@ -203,10 +203,9 @@ async function processCombinedMessages(
     `"${combinedText.slice(0, 50)}", ${imagePaths.length} image(s)`,
   );
 
-  // Build enriched prompt: user context + image paths + text
+  // Build enriched prompt: image paths + text (user context is in system prompt)
   const imageAnnotations = imagePaths.map((p, i) => `[附带图片 ${i + 1}: ${p}]`).join("\n");
   const enrichedPrompt = [
-    `[当前用户 open_id: ${userId}]`,
     imageAnnotations,
     combinedText,
   ].filter(Boolean).join("\n");
@@ -221,12 +220,12 @@ async function processCombinedMessages(
     const tools: string[] = [];
     let accumulatedText = "";
 
-    const result = await runClaude(enrichedPrompt, session, {
+    const result = await runEngine(enrichedPrompt, session, {
       onText: (chunk) => {
         accumulatedText += chunk;
         if (containsSensitiveContent(chunk)) {
           console.error(`[Minister] SECURITY ALERT: Sensitive content detected in response for user ${userId}, aborting`);
-          return false; // Signal claude-bridge to kill the process
+          return false; // Signal engine-bridge to kill the process
         }
         if (!canUpdate(cardMsgId)) return;
         updateCard(cardMsgId, buildStreamingCard(accumulatedText, tools))
@@ -238,10 +237,10 @@ async function processCombinedMessages(
         updateCard(cardMsgId, buildToolUseCard(accumulatedText, tools, toolName))
           .catch((e) => console.warn("[Minister] Card update failed:", e));
       },
-    });
+    }, imagePaths);
 
     console.log(
-      `[Minister] Claude done. textLen=${result.text.length}, tools=${result.tools.length}, session=${result.sessionId}`,
+      `[Minister] ${engineName} done. textLen=${result.text.length}, tools=${result.tools.length}, session=${result.sessionId}`,
     );
     await updateCard(cardMsgId, buildResultCard(result.text || "处理完毕，无文本输出。"));
   } catch (err) {
