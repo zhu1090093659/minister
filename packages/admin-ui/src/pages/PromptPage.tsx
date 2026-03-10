@@ -25,9 +25,9 @@ export function PromptPage() {
     try {
       await api.updateUserPrompt(draft);
       setData((d) => d ? { ...d, customPrompt: draft, source: "user" } : d);
-      showToast("Prompt saved");
+      showToast("提示词已保存");
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     } finally {
       setSaving(false);
     }
@@ -39,49 +39,49 @@ export function PromptPage() {
       await api.deleteUserPrompt();
       setDraft("");
       setData((d) => d ? { ...d, customPrompt: null, source: "system" } : d);
-      showToast("Reset to system default");
+      showToast("已恢复为系统默认值");
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     } finally {
       setSaving(false);
     }
   }
 
-  if (!data) return <div className="empty-state"><p>Loading...</p></div>;
+  if (!data) return <div className="empty-state"><p>加载中...</p></div>;
 
   return (
     <div>
       <div className="page-header">
-        <h2>System Prompt</h2>
-        <p>Customize the system prompt for your personal AI assistant</p>
+        <h2>系统提示词</h2>
+        <p>为你的个人 AI 助手自定义系统提示词</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h3>Current Source: <span className={`badge badge-${data.source}`}>{data.source}</span></h3>
+          <h3>当前来源：<span className={`badge badge-${data.source}`}>{data.source}</span></h3>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-sm" onClick={handleReset} disabled={saving || !data.customPrompt}>
-              Reset to Default
+              恢复默认
             </button>
             <button className="btn btn-sm btn-primary" onClick={handleSave} disabled={saving || !draft.trim()}>
-              {saving ? "Saving..." : "Save"}
+              {saving ? "保存中..." : "保存"}
             </button>
           </div>
         </div>
 
         <div className="form-group">
-          <label>Custom System Prompt</label>
+          <label>自定义系统提示词</label>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Enter your custom system prompt here... Leave empty to use system default."
+            placeholder="在此输入自定义系统提示词...留空则使用系统默认值。"
             rows={16}
           />
         </div>
 
         <details style={{ marginTop: 16 }}>
           <summary style={{ cursor: "pointer", color: "var(--text-secondary)", fontSize: 13 }}>
-            View System Default
+            查看系统默认值
           </summary>
           <pre style={{
             marginTop: 8,
@@ -99,7 +99,7 @@ export function PromptPage() {
         </details>
       </div>
 
-      {toast && <div className={`toast ${toast.startsWith("Error") ? "toast-error" : "toast-success"}`}>{toast}</div>}
+      {toast && <div className={`toast ${toast.startsWith("错误") ? "toast-error" : "toast-success"}`}>{toast}</div>}
     </div>
   );
 }

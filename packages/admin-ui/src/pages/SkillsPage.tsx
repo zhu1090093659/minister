@@ -50,20 +50,20 @@ export function SkillsPage() {
       await api.updateUserSkill(name, editSkill.content);
       await loadSkills();
       setShowEditor(false);
-      showToast(`Skill "/${name}" saved`);
+      showToast(`技能 "/${name}" 已保存`);
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     }
   }
 
   async function handleDelete(name: string) {
-    if (!confirm(`Delete skill "/${name}"?`)) return;
+    if (!confirm(`确定删除技能 "/${name}"？`)) return;
     try {
       await api.deleteUserSkill(name);
       await loadSkills();
-      showToast(`Skill "/${name}" deleted`);
+      showToast(`技能 "/${name}" 已删除`);
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     }
   }
 
@@ -72,25 +72,25 @@ export function SkillsPage() {
       await api.toggleUserSkill(name, enabled);
       setSkills((s) => s.map((sk) => sk.name === name ? { ...sk, enabled } : sk));
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     }
   }
 
   return (
     <div>
       <div className="page-header">
-        <h2>Skills</h2>
-        <p>Manage custom skills invoked via /{"{name}"} in conversations</p>
+        <h2>技能</h2>
+        <p>管理通过 /{"{name}"} 在对话中调用的自定义技能</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h3>{skills.length} Skill{skills.length !== 1 ? "s" : ""}</h3>
-          <button className="btn btn-sm btn-primary" onClick={openNew}><Plus size={14} /> Create Skill</button>
+          <h3>{skills.length} 个技能</h3>
+          <button className="btn btn-sm btn-primary" onClick={openNew}><Plus size={14} /> 创建技能</button>
         </div>
 
         {skills.length === 0 ? (
-          <div className="empty-state"><p>No skills yet</p></div>
+          <div className="empty-state"><p>暂无技能</p></div>
         ) : (
           <div className="config-list">
             {skills.map((s) => (
@@ -100,13 +100,13 @@ export function SkillsPage() {
                   {s.description && <span className="config-item-desc">{s.description}</span>}
                 </div>
                 <div className="config-item-actions">
-                  {s.isBuiltin && <span className="badge badge-builtin">built-in</span>}
+                  {s.isBuiltin && <span className="badge badge-builtin">内置</span>}
                   <div
                     className={`toggle ${s.enabled ? "active" : ""}`}
                     onClick={() => handleToggle(s.name, !s.enabled)}
-                    title={s.enabled ? "Disable" : "Enable"}
+                    title={s.enabled ? "禁用" : "启用"}
                   />
-                  <button className="btn btn-sm" onClick={() => openEdit(s.name)}><Eye size={12} /> View</button>
+                  <button className="btn btn-sm" onClick={() => openEdit(s.name)}><Eye size={12} /> 查看</button>
                   {!s.isBuiltin && (
                     <button className="btn btn-sm btn-danger" onClick={() => handleDelete(s.name)}><Trash2 size={12} /></button>
                   )}
@@ -120,11 +120,11 @@ export function SkillsPage() {
       {showEditor && editSkill && (
         <div className="modal-overlay" onClick={() => setShowEditor(false)}>
           <div className="modal" style={{ maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
-            <h3>{editSkill.isNew ? "Create Skill" : `Edit /${editSkill.name}`}</h3>
+            <h3>{editSkill.isNew ? "创建技能" : `编辑 /${editSkill.name}`}</h3>
 
             {editSkill.isNew && (
               <div className="form-group">
-                <label>Skill Name (lowercase, hyphens OK)</label>
+                <label>技能名称（小写字母，可用连字符）</label>
                 <input
                   className="input"
                   value={editSkill.name}
@@ -135,7 +135,7 @@ export function SkillsPage() {
             )}
 
             <div className="form-group">
-              <label>SKILL.md Content</label>
+              <label>SKILL.md 内容</label>
               <textarea
                 value={editSkill.content}
                 onChange={(e) => setEditSkill({ ...editSkill, content: e.target.value })}
@@ -145,14 +145,14 @@ export function SkillsPage() {
             </div>
 
             <div className="modal-actions">
-              <button className="btn" onClick={() => setShowEditor(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>Save</button>
+              <button className="btn" onClick={() => setShowEditor(false)}>取消</button>
+              <button className="btn btn-primary" onClick={handleSave}>保存</button>
             </div>
           </div>
         </div>
       )}
 
-      {toast && <div className={`toast ${toast.startsWith("Error") ? "toast-error" : "toast-success"}`}>{toast}</div>}
+      {toast && <div className={`toast ${toast.startsWith("错误") ? "toast-error" : "toast-success"}`}>{toast}</div>}
     </div>
   );
 }

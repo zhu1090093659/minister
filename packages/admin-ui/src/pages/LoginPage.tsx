@@ -18,10 +18,10 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Minister Admin</h1>
-        <p>Log in with your Feishu account to manage bot configuration</p>
+        <h1>Minister 管理后台</h1>
+        <p>使用飞书账号登录以管理机器人配置</p>
         <button className="btn btn-feishu" onClick={handleLogin} disabled={loading}>
-          {loading ? "Redirecting..." : "Login with Feishu"}
+          {loading ? "跳转中..." : "飞书登录"}
         </button>
       </div>
     </div>

@@ -54,20 +54,20 @@ export function McpPage() {
       await api.updateUserMcp(name, config);
       await loadServers();
       setShowForm(false);
-      showToast(`Server "${name}" saved`);
+      showToast(`服务器 "${name}" 已保存`);
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     }
   }
 
   async function handleDelete(name: string) {
-    if (!confirm(`Delete MCP server "${name}"?`)) return;
+    if (!confirm(`确定删除 MCP 服务器 "${name}"？`)) return;
     try {
       await api.deleteUserMcp(name);
       await loadServers();
-      showToast(`Server "${name}" deleted`);
+      showToast(`服务器 "${name}" 已删除`);
     } catch (err: any) {
-      showToast("Error: " + err.message);
+      showToast("错误：" + err.message);
     }
   }
 
@@ -85,18 +85,18 @@ export function McpPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>MCP Servers</h2>
-        <p>Manage Model Context Protocol servers for your workspace</p>
+        <h2>MCP 服务器</h2>
+        <p>管理工作区的 Model Context Protocol 服务器</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <h3>{entries.length} Server{entries.length !== 1 ? "s" : ""}</h3>
-          <button className="btn btn-sm btn-primary" onClick={openAdd}><Plus size={14} /> Add Server</button>
+          <h3>{entries.length} 个服务器</h3>
+          <button className="btn btn-sm btn-primary" onClick={openAdd}><Plus size={14} /> 添加服务器</button>
         </div>
 
         {entries.length === 0 ? (
-          <div className="empty-state"><p>No MCP servers configured yet</p></div>
+          <div className="empty-state"><p>尚未配置 MCP 服务器</p></div>
         ) : (
           <div className="config-list">
             {entries.map(([name, srv]) => (
@@ -108,14 +108,14 @@ export function McpPage() {
                   </span>
                   {testResults[name] && (
                     <span style={{ fontSize: 11, color: testResults[name].ok ? "var(--success)" : "var(--danger)" }}>
-                      {testResults[name].ok ? "Connected" : `Failed: ${testResults[name].detail || "Unknown error"}`}
+                      {testResults[name].ok ? "已连接" : `失败：${testResults[name].detail || "未知错误"}`}
                     </span>
                   )}
                 </div>
                 <div className="config-item-actions">
                   <span className={`badge badge-${srv.type === "stdio" ? "system" : "user"}`}>{srv.type}</span>
-                  <button className="btn btn-sm" onClick={() => handleTest(name)} title="Test connection"><Play size={12} /></button>
-                  <button className="btn btn-sm" onClick={() => openEdit(name, srv)}>Edit</button>
+                  <button className="btn btn-sm" onClick={() => handleTest(name)} title="测试连接"><Play size={12} /></button>
+                  <button className="btn btn-sm" onClick={() => openEdit(name, srv)}>编辑</button>
                   <button className="btn btn-sm btn-danger" onClick={() => handleDelete(name)}><Trash2 size={12} /></button>
                 </div>
               </div>
@@ -127,17 +127,17 @@ export function McpPage() {
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{editName ? `Edit "${editName}"` : "Add MCP Server"}</h3>
+            <h3>{editName ? `编辑 "${editName}"` : "添加 MCP 服务器"}</h3>
 
             {!editName && (
               <div className="form-group">
-                <label>Name</label>
+                <label>名称</label>
                 <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="my-server" />
               </div>
             )}
 
             <div className="form-group">
-              <label>Type</label>
+              <label>类型</label>
               <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as any })}>
                 <option value="stdio">stdio</option>
                 <option value="sse">SSE</option>
@@ -148,11 +148,11 @@ export function McpPage() {
             {form.type === "stdio" ? (
               <>
                 <div className="form-group">
-                  <label>Command</label>
+                  <label>命令</label>
                   <input className="input" value={form.command || ""} onChange={(e) => setForm({ ...form, command: e.target.value })} placeholder="npx" />
                 </div>
                 <div className="form-group">
-                  <label>Args (one per line)</label>
+                  <label>参数（每行一个）</label>
                   <textarea
                     value={(form.args || []).join("\n")}
                     onChange={(e) => setForm({ ...form, args: e.target.value.split("\n").filter(Boolean) })}
@@ -161,7 +161,7 @@ export function McpPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Environment Variables (KEY=VALUE, one per line)</label>
+                  <label>环境变量（KEY=VALUE，每行一个）</label>
                   <textarea
                     value={Object.entries(form.env || {}).map(([k, v]) => `${k}=${v}`).join("\n")}
                     onChange={(e) => {
@@ -184,7 +184,7 @@ export function McpPage() {
                   <input className="input" value={form.url || ""} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="http://localhost:8080/sse" />
                 </div>
                 <div className="form-group">
-                  <label>Headers (KEY=VALUE, one per line)</label>
+                  <label>请求头（KEY=VALUE，每行一个）</label>
                   <textarea
                     value={Object.entries(form.headers || {}).map(([k, v]) => `${k}=${v}`).join("\n")}
                     onChange={(e) => {
@@ -203,14 +203,14 @@ export function McpPage() {
             )}
 
             <div className="modal-actions">
-              <button className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>Save</button>
+              <button className="btn" onClick={() => setShowForm(false)}>取消</button>
+              <button className="btn btn-primary" onClick={handleSave}>保存</button>
             </div>
           </div>
         </div>
       )}
 
-      {toast && <div className={`toast ${toast.startsWith("Error") ? "toast-error" : "toast-success"}`}>{toast}</div>}
+      {toast && <div className={`toast ${toast.startsWith("错误") ? "toast-error" : "toast-success"}`}>{toast}</div>}
     </div>
   );
 }
