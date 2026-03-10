@@ -12,6 +12,7 @@ import {
   buildToolUseCard,
   buildErrorCard,
 } from "./card-builder.js";
+import { readAdminConfig } from "@minister/shared";
 
 // Deduplicate events delivered more than once by Feishu SDK
 // Map value is the insertion timestamp; a single interval handles all expiry
@@ -292,11 +293,24 @@ export async function handleMessage(data: {
 
   if (!SUPPORTED_TYPES.has(message.message_type)) return;
 
-  // In group chat, only respond when the bot itself is @mentioned
+  // In group chat, check admin-config for group behavior settings
   if (message.chat_type === "group") {
-    if (!message.mentions?.length) return;
-    const myOpenId = await getBotOpenId();
-    if (!myOpenId || !message.mentions.some((m) => m.id.open_id === myOpenId)) return;
+    const groupCfg = readAdminConfig(message.chat_id);
+    const behavior = groupCfg?.groupBehavior;
+    const requireMention = behavior?.requireMention ?? true;
+
+    if (requireMention) {
+      if (!message.mentions?.length) return;
+      const myOpenId = await getBotOpenId();
+      if (!myOpenId || !message.mentions.some((m) => m.id.open_id === myOpenId)) return;
+    }
+
+    // Member whitelist: if set, only listed users can trigger the bot
+    const whitelist = behavior?.memberWhitelist;
+    if (whitelist?.length) {
+      const senderId = sender.sender_id.open_id || sender.sender_id.user_id;
+      if (senderId && !whitelist.includes(senderId)) return;
+    }
   }
 
   const userId = sender.sender_id.open_id || sender.sender_id.user_id || "unknown";

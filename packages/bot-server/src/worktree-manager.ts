@@ -124,9 +124,15 @@ function refreshDeployFiles(worktreePath: string): void {
   if (existsSync(overridePath)) chmodSync(overridePath, 0o600);
   writeFileSync(overridePath, CACHED_AGENTS_OVERRIDE, { mode: 0o444 });
 
-  // settings.json — permission deny-rules (security: new deny rules must propagate)
+  // settings.json — merge permissions into existing file to preserve user-installed mcpServers.
+  // Previous behavior was full overwrite, which wiped any MCP configs added via AI conversation.
   const settingsPath = resolve(worktreePath, ".claude/settings.json");
-  writeFileSync(settingsPath, CACHED_SETTINGS_JSON, { mode: 0o600 });
+  let merged: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try { merged = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch { /* corrupt file, reset */ }
+  }
+  merged.permissions = USER_SETTINGS.permissions;
+  writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + "\n", { mode: 0o600 });
 
   // Built-in skills — refresh on each deploy so existing users get new/updated skills
   for (const [name, content] of BUILTIN_SKILLS) {

@@ -11,7 +11,9 @@
     "bot": "bun run packages/bot-server/src/index.ts",
     "mcp": "bun run packages/feishu-mcp/src/index.ts",
     "generate-settings": "bun run scripts/generate-claude-settings.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "admin:dev": "bun run --cwd packages/admin-ui dev",
+    "admin:build": "bun run --cwd packages/admin-ui build"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

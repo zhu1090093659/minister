@@ -1,4 +1,4 @@
-# Stage 1: Install production dependencies only
+# Stage 1: Install all dependencies (including devDependencies for admin-ui build)
 FROM oven/bun:1-debian AS deps
 
 ARG NPM_REGISTRY=https://registry.npmjs.org
@@ -9,9 +9,17 @@ COPY package.json bun.lock ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/bot-server/package.json packages/bot-server/
 COPY packages/feishu-mcp/package.json packages/feishu-mcp/
-RUN bun install --frozen-lockfile --production
+COPY packages/admin-ui/package.json packages/admin-ui/
+RUN bun install --frozen-lockfile
 
-# Stage 2: Final runtime image
+# Stage 2: Build admin-ui static assets
+FROM deps AS admin-build
+COPY packages/shared/ packages/shared/
+COPY packages/admin-ui/ packages/admin-ui/
+COPY tsconfig.json ./
+RUN cd packages/admin-ui && bun run build
+
+# Stage 3: Final runtime image
 FROM oven/bun:1-debian
 
 ARG APT_MIRROR=deb.debian.org
@@ -36,7 +44,7 @@ RUN bun install -g @openai/codex
 
 WORKDIR /app
 
-# Copy installed dependencies
+# Copy installed dependencies (production only — reinstall without devDependencies)
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy source code and config
@@ -48,6 +56,9 @@ COPY packages/feishu-mcp/ packages/feishu-mcp/
 # Copy workspace-specific node_modules (Bun places per-workspace deps here, not root)
 COPY --from=deps /app/packages/bot-server/node_modules ./packages/bot-server/node_modules
 COPY --from=deps /app/packages/feishu-mcp/node_modules ./packages/feishu-mcp/node_modules
+
+# Copy admin-ui build output (static files served by Hono)
+COPY --from=admin-build /app/packages/admin-ui/dist packages/admin-ui/dist
 COPY .claude/ .claude/
 COPY config/ config/
 COPY scripts/ scripts/

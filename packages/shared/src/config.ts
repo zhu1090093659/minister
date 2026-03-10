@@ -44,4 +44,10 @@ export const config = {
   // to ~/.codex/config.toml by scripts/generate-codex-config.ts at startup.
   userDataDir: resolve(PROJECT_ROOT, "data/users"),
   worktreeDir: resolve(PROJECT_ROOT, "data/worktrees"),
+
+  // Admin panel HTTP server
+  admin: {
+    port: Number(process.env.ADMIN_PORT) || 3000,
+    jwtSecret: process.env.ADMIN_JWT_SECRET || "minister-admin-default-secret",
+  },
 } as const;

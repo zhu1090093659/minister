@@ -3,7 +3,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import type { Session } from "@minister/shared";
-import { config, PROJECT_ROOT } from "@minister/shared";
+import { config, PROJECT_ROOT, resolveSystemPrompt } from "@minister/shared";
 import { ensureUserWorktree } from "./worktree-manager.js";
 import { ClaudeAdapter, CodexAdapter, type EngineAdapter, type ParsedEvent } from "./engine-adapter.js";
 
@@ -91,6 +91,9 @@ export async function runEngine(
   // Codex reads model from config.toml; only Claude needs the model param
   const model = config.claude.model;
 
+  // Resolve effective system prompt: group config > personal config > global default
+  const effectivePrompt = resolveSystemPrompt(config.systemPrompt, session.userId, session.chatId);
+
   // Prepend user context as a system tag so the model knows the caller
   // but treats it as metadata rather than part of the user's message
   const contextualPrompt = `<context user_open_id="${session.userId}" />\n${prompt}`;
@@ -98,7 +101,7 @@ export async function runEngine(
   const { command, args } = adapter.buildArgs({
     prompt: contextualPrompt,
     model,
-    systemPrompt: config.systemPrompt,
+    systemPrompt: effectivePrompt,
     mcpConfigPath,
     conversationId: session.conversationId,
     imagePaths,

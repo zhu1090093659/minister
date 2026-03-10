@@ -5,5 +5,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "${ADMIN_PORT:-3000}:${ADMIN_PORT:-3000}"
     volumes:
       - ./data:/app/data
