@@ -1,6 +1,9 @@
 # Stage 1: Install production dependencies only
 FROM oven/bun:1-debian AS deps
 
+ARG NPM_REGISTRY=https://registry.npmjs.org
+ENV BUN_CONFIG_REGISTRY=$NPM_REGISTRY
+
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages/shared/package.json packages/shared/
@@ -27,6 +30,8 @@ ENV PATH="/root/.local/bin:${PATH}"
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Install Codex CLI (npm global — only used when ENGINE_TYPE=codex)
+ARG NPM_REGISTRY=https://registry.npmjs.org
+ENV BUN_CONFIG_REGISTRY=$NPM_REGISTRY
 RUN bun install -g @openai/codex
 
 WORKDIR /app
