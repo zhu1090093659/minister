@@ -49,5 +49,6 @@ export const config = {
   admin: {
     port: Number(process.env.ADMIN_PORT) || 3000,
     jwtSecret: process.env.ADMIN_JWT_SECRET || "minister-admin-default-secret",
+    baseUrl: process.env.ADMIN_BASE_URL || "",
   },
 } as const;

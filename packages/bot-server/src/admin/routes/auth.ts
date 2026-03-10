@@ -14,9 +14,10 @@ const FEISHU_USER_INFO_URL = "https://open.feishu.cn/open-apis/authen/v1/user_in
 
 // GET /api/v1/auth/feishu-url — return the Feishu OAuth authorization URL
 auth.get("/feishu-url", (c) => {
-  const redirectUri = c.req.query("redirect_uri") || `${getOrigin(c)}/api/v1/auth/callback`;
+  const base = config.admin.baseUrl || getOrigin(c);
+  const redirectUri = c.req.query("redirect_uri") || `${base}/api/v1/auth/callback`;
   const url = `${FEISHU_AUTHORIZE_URL}?app_id=${config.feishu.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-  return c.json({ url });
+  return c.json({ url, redirectUri });
 });
 
 // GET /api/v1/auth/callback — exchange code for user token, set JWT cookie, redirect to app
@@ -67,8 +68,11 @@ auth.get("/callback", async (c) => {
     const token = await createToken({ openId: open_id, name, avatarUrl: avatar_url });
     setTokenCookie(c, token);
 
-    // Redirect to admin UI
-    return c.redirect("/");
+    console.log("[Admin Auth] OAuth success for", name, "— redirecting to /");
+
+    // Use HTML redirect instead of 302 to guarantee Set-Cookie header is processed
+    // (some Hono/Bun combos may not preserve setCookie headers on c.redirect())
+    return c.html(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/"></head><body></body></html>`);
   } catch (err) {
     console.error("[Admin Auth] OAuth callback error:", err);
     return c.json({ error: "OAuth callback failed" }, 500);

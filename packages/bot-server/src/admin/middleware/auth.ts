@@ -45,17 +45,21 @@ export function setTokenCookie(c: Context, token: string): void {
 // Auth middleware — require valid JWT; sets c.get("user")
 export const authMiddleware = createMiddleware(async (c, next) => {
   const token = extractToken(c);
-  if (!token) return c.json({ error: "Unauthorized" }, 401);
+  if (!token) {
+    console.log("[Auth] No token found for", c.req.method, c.req.path);
+    return c.json({ error: "Unauthorized" }, 401);
+  }
 
   try {
-    const payload = await verify(token, JWT_SECRET);
+    const payload = await verify(token, JWT_SECRET, "HS256");
     c.set("user", {
       openId: payload.sub as string,
       name: payload.name as string | undefined,
       avatarUrl: payload.avatar as string | undefined,
     });
     await next();
-  } catch {
+  } catch (err) {
+    console.log("[Auth] Token verification failed for", c.req.path, err);
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 });
