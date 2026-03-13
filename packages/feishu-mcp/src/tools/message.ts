@@ -11,6 +11,10 @@ export const messageToolDefs = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id. Ignored for bot-only messaging tools.",
+        },
         receive_id: {
           type: "string",
           description: "Target ID (chat_id, open_id, or user_id)",
@@ -40,6 +44,10 @@ export const messageToolDefs = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id. Ignored for bot-only messaging tools.",
+        },
         message_id: { type: "string", description: "ID of message to reply" },
         msg_type: {
           type: "string",
@@ -58,6 +66,10 @@ export const messageToolDefs = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id. Ignored for bot-only messaging tools.",
+        },
         container_id: { type: "string", description: "Chat ID" },
         page_size: {
           type: "number",

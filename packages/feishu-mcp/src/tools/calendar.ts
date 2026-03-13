@@ -2,6 +2,7 @@
 import { larkClient } from "../client.js";
 import { toUnixSeconds, unknownToolError } from "../utils.js";
 import type { ToolResult } from "@minister/shared";
+import type { LarkRequestOptions } from "../user-token.js";
 
 // Cache the Promise itself so concurrent callers share a single in-flight request
 let primaryCalendarIdPromise: Promise<string> | undefined;
@@ -64,7 +65,7 @@ export const calendarToolDefs = [
           description: "Event attendees",
         },
       },
-      required: ["summary", "start_time", "end_time"],
+      required: ["summary", "start_time", "end_time", "user_open_id"],
     },
   },
   {
@@ -77,6 +78,10 @@ export const calendarToolDefs = [
           type: "string",
           description: "Calendar ID (default: primary)",
         },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         start_time: {
           type: "string",
           description: "Range start (Unix timestamp in seconds)",
@@ -86,7 +91,7 @@ export const calendarToolDefs = [
           description: "Range end (Unix timestamp in seconds)",
         },
       },
-      required: ["start_time", "end_time"],
+      required: ["start_time", "end_time", "user_open_id"],
     },
   },
   {
@@ -96,6 +101,10 @@ export const calendarToolDefs = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         user_ids: {
           type: "array",
           items: { type: "string" },
@@ -110,7 +119,7 @@ export const calendarToolDefs = [
           description: "Range end (Unix timestamp in seconds)",
         },
       },
-      required: ["user_ids", "start_time", "end_time"],
+      required: ["user_ids", "start_time", "end_time", "user_open_id"],
     },
   },
 ];
@@ -118,6 +127,7 @@ export const calendarToolDefs = [
 export async function handleCalendarTool(
   name: string,
   args: Record<string, unknown>,
+  larkOptions?: LarkRequestOptions,
 ): Promise<ToolResult> {
   switch (name) {
     case "cal_create_event": {
@@ -129,8 +139,9 @@ export async function handleCalendarTool(
       const startTs = toUnixSeconds(args.start_time as string);
       const endTs = toUnixSeconds(args.end_time as string);
 
-      // Use cached calendar ID (app has no "primary"; pick first owned/writable)
-      const calendarId = await getPrimaryCalendarId();
+      const calendarId = larkOptions
+        ? "primary"
+        : await getPrimaryCalendarId();
 
       const res = await larkClient.calendar.v4.calendarEvent.create({
         path: { calendar_id: calendarId },
@@ -141,14 +152,15 @@ export async function handleCalendarTool(
           end_time: { timestamp: endTs },
           attendee_ability: "can_modify_event",
         },
-      });
+      }, larkOptions);
 
       const eventId = res.data?.event?.event_id;
 
-      // Add requesting user and extra attendees
+      // With user identity the event already belongs to the requester,
+      // so only add explicitly requested attendees.
       if (eventId) {
         const allAttendees: Array<{ type: "user" | "chat" | "resource"; user_id?: string; chat_id?: string }> = [];
-        if (userOpenId) {
+        if (userOpenId && !larkOptions) {
           allAttendees.push({ type: "user", user_id: userOpenId });
         }
         if (extraAttendees?.length) {
@@ -165,7 +177,7 @@ export async function handleCalendarTool(
             path: { calendar_id: calendarId, event_id: eventId },
             params: { user_id_type: "open_id" },
             data: { attendees: allAttendees },
-          });
+          }, larkOptions);
         }
       }
 
@@ -188,7 +200,7 @@ export async function handleCalendarTool(
           end_time: toUnixSeconds(args.end_time as string),
           page_size: 50,
         },
-      });
+      }, larkOptions);
       const events = (res.data?.items ?? []).map((e) => ({
         event_id: e.event_id,
         summary: e.summary,
@@ -211,7 +223,7 @@ export async function handleCalendarTool(
           time_max: toUnixSeconds(args.end_time as string),
           user_id: { user_ids: userIds, id_type: "open_id" } as any,
         },
-      });
+      }, larkOptions);
       return {
         content: [
           {

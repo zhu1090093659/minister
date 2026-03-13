@@ -2,6 +2,7 @@
 import { larkClient } from "../client.js";
 import { unknownToolError } from "../utils.js";
 import type { ToolResult } from "@minister/shared";
+import type { LarkRequestOptions } from "../user-token.js";
 
 export const contactToolDefs = [
   {
@@ -12,12 +13,16 @@ export const contactToolDefs = [
       type: "object" as const,
       properties: {
         query: { type: "string", description: "Search keyword (name, etc)" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         page_size: {
           type: "number",
           description: "Max results to return (default 10)",
         },
       },
-      required: ["query"],
+      required: ["query", "user_open_id"],
     },
   },
   {
@@ -27,13 +32,17 @@ export const contactToolDefs = [
       type: "object" as const,
       properties: {
         user_id: { type: "string", description: "User ID or Open ID" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         user_id_type: {
           type: "string",
           enum: ["open_id", "user_id", "union_id"],
           description: "ID type, default open_id",
         },
       },
-      required: ["user_id"],
+      required: ["user_id", "user_open_id"],
     },
   },
 ];
@@ -41,6 +50,7 @@ export const contactToolDefs = [
 export async function handleContactTool(
   name: string,
   args: Record<string, unknown>,
+  larkOptions?: LarkRequestOptions,
 ): Promise<ToolResult> {
   switch (name) {
     case "contact_search": {
@@ -51,7 +61,7 @@ export async function handleContactTool(
           user_id_type: "open_id",
         },
         data: { query: args.query as string },
-      });
+      }, larkOptions);
       const users = (res.data?.items ?? []).map((u: any) => ({
         open_id: u.user_id,
         name: u.name,
@@ -71,7 +81,7 @@ export async function handleContactTool(
             (args.user_id_type as "open_id" | "user_id" | "union_id") ||
             "open_id",
         },
-      });
+      }, larkOptions);
       const u = res.data?.user;
       const info = {
         open_id: u?.open_id,

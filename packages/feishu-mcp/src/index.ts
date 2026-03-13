@@ -13,6 +13,7 @@ import { contactToolDefs, handleContactTool } from "./tools/contact.js";
 import { bitableToolDefs, handleBitableTool } from "./tools/bitable.js";
 import { documentToolDefs, handleDocumentTool } from "./tools/document.js";
 import { calendarToolDefs, handleCalendarTool } from "./tools/calendar.js";
+import { getUserTokenOption, type LarkRequestOptions } from "./user-token.js";
 
 const allTools = [
   ...messageToolDefs,
@@ -27,7 +28,11 @@ const allTools = [
 type ToolDef = { name: string; description: string; inputSchema: { type: "object"; properties: Record<string, unknown>; required?: string[] } };
 const toolModules: Array<{
   defs: readonly ToolDef[];
-  handler: (name: string, args: Record<string, unknown>) => Promise<ToolResult>;
+  handler: (
+    name: string,
+    args: Record<string, unknown>,
+    larkOptions?: LarkRequestOptions,
+  ) => Promise<ToolResult>;
 }> = [
   { defs: messageToolDefs, handler: handleMessageTool },
   { defs: taskToolDefs, handler: handleTaskTool },
@@ -39,10 +44,12 @@ const toolModules: Array<{
 
 const toolHandlers = new Map<
   string,
-  (args: Record<string, unknown>) => Promise<ToolResult>
+  (args: Record<string, unknown>, larkOptions?: LarkRequestOptions) => Promise<ToolResult>
 >();
 for (const { defs, handler } of toolModules) {
-  for (const def of defs) toolHandlers.set(def.name, (a) => handler(def.name, a));
+  for (const def of defs) {
+    toolHandlers.set(def.name, (args, larkOptions) => handler(def.name, args, larkOptions));
+  }
 }
 
 const server = new Server(
@@ -64,7 +71,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request, _extra): Promise
     };
   }
   try {
-    return await handler((args ?? {}) as Record<string, unknown>);
+    const toolArgs = (args ?? {}) as Record<string, unknown>;
+    const userOpenId =
+      (toolArgs.user_open_id as string | undefined) ||
+      (toolArgs.owner_open_id as string | undefined) ||
+      (toolArgs.creator_open_id as string | undefined);
+    const larkOptions = await getUserTokenOption(userOpenId);
+    return await handler(toolArgs, larkOptions);
   } catch (err: unknown) {
     // Dump full error for debugging Feishu API issues
     let detail: string;

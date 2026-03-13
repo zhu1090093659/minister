@@ -2,6 +2,7 @@
 import { larkClient } from "../client.js";
 import { unknownToolError } from "../utils.js";
 import type { ToolResult } from "@minister/shared";
+import type { LarkRequestOptions } from "../user-token.js";
 
 export const bitableToolDefs = [
   {
@@ -11,12 +12,16 @@ export const bitableToolDefs = [
       type: "object" as const,
       properties: {
         name: { type: "string", description: "Bitable app name" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         folder_token: {
           type: "string",
           description: "Folder token to create in (optional)",
         },
       },
-      required: ["name"],
+      required: ["name", "user_open_id"],
     },
   },
   {
@@ -27,13 +32,17 @@ export const bitableToolDefs = [
       properties: {
         app_token: { type: "string", description: "Bitable app token" },
         table_id: { type: "string", description: "Table ID" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         fields: {
           type: "object",
           description:
             "Field name-value pairs. e.g. { '任务名称': 'Do X', '状态': '进行中' }",
         },
       },
-      required: ["app_token", "table_id", "fields"],
+      required: ["app_token", "table_id", "fields", "user_open_id"],
     },
   },
   {
@@ -45,6 +54,10 @@ export const bitableToolDefs = [
       properties: {
         app_token: { type: "string", description: "Bitable app token" },
         table_id: { type: "string", description: "Table ID" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         filter: {
           type: "string",
           description:
@@ -63,7 +76,7 @@ export const bitableToolDefs = [
         },
         page_size: { type: "number", description: "Max records (default 20)" },
       },
-      required: ["app_token", "table_id"],
+      required: ["app_token", "table_id", "user_open_id"],
     },
   },
   {
@@ -75,12 +88,16 @@ export const bitableToolDefs = [
         app_token: { type: "string", description: "Bitable app token" },
         table_id: { type: "string", description: "Table ID" },
         record_id: { type: "string", description: "Record ID to update" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         fields: {
           type: "object",
           description: "Field name-value pairs to update",
         },
       },
-      required: ["app_token", "table_id", "record_id", "fields"],
+      required: ["app_token", "table_id", "record_id", "fields", "user_open_id"],
     },
   },
   {
@@ -92,6 +109,10 @@ export const bitableToolDefs = [
       properties: {
         app_token: { type: "string", description: "Bitable app token" },
         name: { type: "string", description: "Table name" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         fields: {
           type: "array",
           items: {
@@ -109,7 +130,7 @@ export const bitableToolDefs = [
           description: "Array of field definitions for the table columns",
         },
       },
-      required: ["app_token", "name", "fields"],
+      required: ["app_token", "name", "fields", "user_open_id"],
     },
   },
   {
@@ -119,8 +140,12 @@ export const bitableToolDefs = [
       type: "object" as const,
       properties: {
         app_token: { type: "string", description: "Bitable app token" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
       },
-      required: ["app_token"],
+      required: ["app_token", "user_open_id"],
     },
   },
 ];
@@ -128,6 +153,7 @@ export const bitableToolDefs = [
 export async function handleBitableTool(
   name: string,
   args: Record<string, unknown>,
+  larkOptions?: LarkRequestOptions,
 ): Promise<ToolResult> {
   switch (name) {
     case "bitable_create_app": {
@@ -136,7 +162,7 @@ export async function handleBitableTool(
           name: args.name as string,
           folder_token: (args.folder_token as string) || undefined,
         },
-      });
+      }, larkOptions);
       const app = res.data?.app;
       return {
         content: [
@@ -155,7 +181,7 @@ export async function handleBitableTool(
           table_id: args.table_id as string,
         },
         data: { fields: args.fields as any },
-      });
+      }, larkOptions);
       return {
         content: [
           {
@@ -177,7 +203,7 @@ export async function handleBitableTool(
           sort: args.sort ? JSON.stringify(args.sort) : undefined,
           page_size: (args.page_size as number) || 20,
         },
-      });
+      }, larkOptions);
       const records = (res.data?.items ?? []).map((r) => ({
         record_id: r.record_id,
         fields: r.fields,
@@ -195,7 +221,7 @@ export async function handleBitableTool(
           record_id: args.record_id as string,
         },
         data: { fields: args.fields as any },
-      });
+      }, larkOptions);
       return {
         content: [
           {
@@ -222,7 +248,7 @@ export async function handleBitableTool(
             })),
           },
         },
-      });
+      }, larkOptions);
       return {
         content: [
           {
@@ -236,7 +262,7 @@ export async function handleBitableTool(
     case "bitable_list_tables": {
       const res = await larkClient.bitable.v1.appTable.list({
         path: { app_token: args.app_token as string },
-      });
+      }, larkOptions);
       const tables = (res.data?.items ?? []).map((t) => ({
         table_id: t.table_id,
         name: t.name,

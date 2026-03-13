@@ -3,7 +3,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import type { Session } from "@minister/shared";
-import { config, PROJECT_ROOT, resolveSystemPrompt } from "@minister/shared";
+import { config, PROJECT_ROOT, hasValidFeishuToken, resolveSystemPrompt } from "@minister/shared";
 import { ensureUserWorktree } from "./worktree-manager.js";
 import { ClaudeAdapter, CodexAdapter, type EngineAdapter, type ParsedEvent } from "./engine-adapter.js";
 
@@ -93,10 +93,12 @@ export async function runEngine(
 
   // Resolve effective system prompt: group config > personal config > global default
   const effectivePrompt = resolveSystemPrompt(config.systemPrompt, session.userId, session.chatId);
+  const userTokenAvailable = hasValidFeishuToken(session.userId);
 
   // Prepend user context as a system tag so the model knows the caller
   // but treats it as metadata rather than part of the user's message
-  const contextualPrompt = `<context user_open_id="${session.userId}" />\n${prompt}`;
+  const contextualPrompt =
+    `<context user_open_id="${session.userId}" user_token_available="${String(userTokenAvailable)}" />\n${prompt}`;
 
   const { command, args } = adapter.buildArgs({
     prompt: contextualPrompt,

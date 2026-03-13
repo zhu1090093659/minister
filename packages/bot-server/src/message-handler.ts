@@ -6,13 +6,14 @@ import { larkClient as client, getBotOpenId } from "./client.js";
 import { sessionManager } from "./session-manager.js";
 import { runEngine, engineName, containsSensitiveContent, SENSITIVE_CONTENT_ERROR } from "./engine-bridge.js";
 import {
+  buildAuthCard,
   buildThinkingCard,
   buildResultCard,
   buildStreamingCard,
   buildToolUseCard,
   buildErrorCard,
 } from "./card-builder.js";
-import { readAdminConfig } from "@minister/shared";
+import { config, hasValidFeishuToken, readAdminConfig } from "@minister/shared";
 
 // Deduplicate events delivered more than once by Feishu SDK
 // Map value is the insertion timestamp; a single interval handles all expiry
@@ -42,6 +43,8 @@ function enqueueForUser(key: string, task: () => Promise<void>): void {
 // Throttle card updates to avoid Feishu rate limits (>= 1.5s between updates)
 const MIN_UPDATE_INTERVAL = 1500;
 const lastUpdateTime = new Map<string, number>();
+const promptedForFeishuAuth = new Set<string>();
+const FEISHU_AUTHORIZE_URL = "https://open.feishu.cn/open-apis/authen/v1/authorize";
 
 function canUpdate(messageId: string): boolean {
   const now = Date.now();
@@ -49,6 +52,12 @@ function canUpdate(messageId: string): boolean {
   if (now - last < MIN_UPDATE_INTERVAL) return false;
   lastUpdateTime.set(messageId, now);
   return true;
+}
+
+function buildBotAuthorizeUrl(): string | undefined {
+  if (!config.admin.baseUrl) return undefined;
+  const redirectUri = `${config.admin.baseUrl}/api/v1/auth/callback`;
+  return `${FEISHU_AUTHORIZE_URL}?app_id=${config.feishu.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=bot`;
 }
 
 async function sendCard(chatId: string, cardJson: string): Promise<string | undefined> {
@@ -173,6 +182,7 @@ async function processCombinedMessages(
   messages: FeishuMessage[],
 ): Promise<void> {
   const session = sessionManager.getOrCreate(userId, chatId);
+  const userTokenAvailable = hasValidFeishuToken(userId);
 
   // Merge text parts and collect all image keys across buffered messages
   const textParts: string[] = [];
@@ -210,6 +220,18 @@ async function processCombinedMessages(
     imageAnnotations,
     combinedText,
   ].filter(Boolean).join("\n");
+
+  if (userTokenAvailable) {
+    promptedForFeishuAuth.delete(userId);
+  } else if (!promptedForFeishuAuth.has(userId)) {
+    const authUrl = buildBotAuthorizeUrl();
+    if (authUrl) {
+      await sendCard(chatId, buildAuthCard(authUrl));
+      promptedForFeishuAuth.add(userId);
+    } else {
+      console.warn("[Minister] ADMIN_BASE_URL is missing, cannot send Feishu auth card");
+    }
+  }
 
   const cardMsgId = await sendCard(chatId, buildThinkingCard());
   if (!cardMsgId) {

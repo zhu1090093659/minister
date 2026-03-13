@@ -9,6 +9,7 @@ import {
   BlockType,
 } from "../markdown-parser.js";
 import type { ToolResult } from "@minister/shared";
+import type { LarkRequestOptions } from "../user-token.js";
 
 export const documentToolDefs = [
   {
@@ -18,16 +19,16 @@ export const documentToolDefs = [
       type: "object" as const,
       properties: {
         title: { type: "string", description: "Document title" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         folder_token: {
           type: "string",
           description: "Folder token to create in (optional)",
         },
-        owner_open_id: {
-          type: "string",
-          description: "User open_id to transfer document ownership to",
-        },
       },
-      required: ["title"],
+      required: ["title", "user_open_id"],
     },
   },
   {
@@ -38,12 +39,17 @@ export const documentToolDefs = [
       type: "object" as const,
       properties: {
         document_id: { type: "string", description: "Document ID" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         url: {
           type: "string",
           description:
             "Feishu document URL. Supports /docx/, /docs/, and /wiki/ paths.",
         },
       },
+      required: ["user_open_id"],
     },
   },
   {
@@ -54,13 +60,17 @@ export const documentToolDefs = [
       type: "object" as const,
       properties: {
         document_id: { type: "string", description: "Document ID" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         content: {
           type: "string",
           description:
             "Markdown-like text content to append. Will be converted to document blocks.",
         },
       },
-      required: ["document_id", "content"],
+      required: ["document_id", "content", "user_open_id"],
     },
   },
 ];
@@ -68,6 +78,7 @@ export const documentToolDefs = [
 export async function handleDocumentTool(
   name: string,
   args: Record<string, unknown>,
+  larkOptions?: LarkRequestOptions,
 ): Promise<ToolResult> {
   switch (name) {
     case "doc_create": {
@@ -76,20 +87,23 @@ export async function handleDocumentTool(
           title: args.title as string,
           folder_token: (args.folder_token as string) || undefined,
         },
-      });
+      }, larkOptions);
       const doc = res.data?.document;
       const docToken = doc?.document_id;
+      const ownerOpenId =
+        (args.user_open_id as string | undefined) ||
+        (args.owner_open_id as string | undefined);
 
-      // Transfer ownership to the requesting user
-      if (docToken && args.owner_open_id) {
+      // Only fall back to transferOwner when the document was created with app identity.
+      if (docToken && ownerOpenId && !larkOptions) {
         await larkClient.drive.v1.permissionMember.transferOwner({
           path: { token: docToken },
           params: { type: "docx", need_notification: false },
           data: {
             member_type: "openid",
-            member_id: args.owner_open_id as string,
+            member_id: ownerOpenId,
           },
-        });
+        }, larkOptions);
       }
 
       return {
@@ -121,7 +135,7 @@ export async function handleDocumentTool(
           // Resolve wiki node token to actual document_id
           const nodeRes = await larkClient.wiki.v2.space.getNode({
             params: { token },
-          });
+          }, larkOptions);
           documentId = nodeRes.data?.node?.obj_token;
           if (!documentId) {
             return {
@@ -143,7 +157,7 @@ export async function handleDocumentTool(
 
       const res = await larkClient.docx.v1.document.rawContent({
         path: { document_id: documentId },
-      });
+      }, larkOptions);
       return {
         content: [
           { type: "text", text: res.data?.content || "(empty document)" },
@@ -165,7 +179,7 @@ export async function handleDocumentTool(
         await larkClient.docx.v1.documentBlockChildren.create({
           path: { document_id: documentId, block_id: documentId },
           data: { children: regularBatch as any, index: -1 },
-        });
+        }, larkOptions);
         regularBatch = [];
       };
 
@@ -202,7 +216,7 @@ export async function handleDocumentTool(
               ] as any,
               index: -1,
             },
-          });
+          }, larkOptions);
 
         // Step 2: Get the created table block and its cell children
         const tableBlock = tableRes.data?.children?.[0];
@@ -225,7 +239,7 @@ export async function handleDocumentTool(
             return larkClient.docx.v1.documentBlockChildren.create({
               path: { document_id: documentId, block_id: cellId },
               data: { children: [buildCellTextBlock(cellText)] as any, index: -1 },
-            });
+            }, larkOptions);
           })
           .filter(Boolean);
         await Promise.all(cellTasks);

@@ -1,9 +1,9 @@
 // Shared worktree file I/O — read/write admin-config.json, CLAUDE.md, skills, settings.json.
 // Used by both bot-server (runtime config resolution) and admin API routes.
 import { resolve } from "node:path";
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { config } from "./config.js";
-import type { AdminConfig, SkillInfo } from "./types.js";
+import type { AdminConfig, FeishuUserToken, SkillInfo } from "./types.js";
 
 // Path validation — reuses the same pattern as worktree-manager.ts
 const SAFE_ID = /^[\w\-:]{1,200}$/;
@@ -25,6 +25,10 @@ function adminConfigPath(id: string): string {
   return resolve(getWorktreePath(id), "admin-config.json");
 }
 
+function feishuTokenPath(id: string): string {
+  return resolve(getWorktreePath(id), "feishu-token.json");
+}
+
 export function readAdminConfig(id: string): AdminConfig | null {
   try {
     return JSON.parse(readFileSync(adminConfigPath(id), "utf-8")) as AdminConfig;
@@ -38,6 +42,26 @@ export function writeAdminConfig(id: string, cfg: AdminConfig): void {
   // Ensure worktree directory exists (group configs may be written before first message)
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, "admin-config.json"), JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
+}
+
+export function readFeishuToken(id: string): FeishuUserToken | null {
+  try {
+    return JSON.parse(readFileSync(feishuTokenPath(id), "utf-8")) as FeishuUserToken;
+  } catch {
+    return null;
+  }
+}
+
+export function writeFeishuToken(id: string, token: FeishuUserToken): void {
+  const dir = getWorktreePath(id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(feishuTokenPath(id), JSON.stringify(token, null, 2) + "\n", { mode: 0o600 });
+}
+
+export function hasValidFeishuToken(id: string): boolean {
+  const token = readFeishuToken(id);
+  if (!token?.refresh_token) return false;
+  return token.refresh_expires_at > Math.floor(Date.now() / 1000);
 }
 
 // ---------------------------------------------------------------------------

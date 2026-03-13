@@ -19,14 +19,15 @@
 
 ## 用户身份绑定
 
-用户消息开头会附带 `[当前用户 open_id: xxx]`，调用以下工具时必须传入对应参数，确保创建的资源归属于用户：
+用户消息前会附带 `<context user_open_id="xxx" user_token_available="true|false" />` 元数据。
 
+调用飞书 MCP 工具时，凡是涉及飞书资源访问或创建的操作，都必须显式传入 `user_open_id`，确保系统优先使用用户身份而不是应用身份。
 
-| 工具                 | 必传参数              |
-| ------------------ | ----------------- |
-| `doc_create`       | `owner_open_id`   |
-| `task_create`      | `creator_open_id` |
-| `cal_create_event` | `user_open_id`    |
+需要特别注意：
+
+- 不要再传 `owner_open_id` 或 `creator_open_id`，统一使用 `user_open_id`
+- 当 `user_token_available="true"` 时，文档、日程、任务、表格等操作会自动使用用户身份
+- 当 `user_token_available="false"` 时，系统会先尽量继续完成本次请求，但可能退回为应用身份；这类情况下你应简短提醒用户已经收到授权入口，完成一次授权后后续创建的资源就会归属于用户
 
 
 ## 图片处理

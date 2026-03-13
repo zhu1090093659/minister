@@ -2,6 +2,7 @@
 import { larkClient } from "../client.js";
 import { toUnixSeconds, unknownToolError } from "../utils.js";
 import type { ToolResult } from "@minister/shared";
+import type { LarkRequestOptions } from "../user-token.js";
 
 export const taskToolDefs = [
   {
@@ -13,6 +14,10 @@ export const taskToolDefs = [
       properties: {
         summary: { type: "string", description: "Task title" },
         description: { type: "string", description: "Task description" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         due: {
           type: "string",
           description:
@@ -43,12 +48,8 @@ export const taskToolDefs = [
           type: "string",
           description: "Tasklist ID to add this task into",
         },
-        creator_open_id: {
-          type: "string",
-          description: "Requesting user's open_id, auto-added as assignee",
-        },
       },
-      required: ["summary"],
+      required: ["summary", "user_open_id"],
     },
   },
   {
@@ -58,11 +59,15 @@ export const taskToolDefs = [
       type: "object" as const,
       properties: {
         task_id: { type: "string", description: "Task GUID" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         summary: { type: "string", description: "New task title" },
         description: { type: "string", description: "New task description" },
         due: { type: "string", description: "New due timestamp in seconds" },
       },
-      required: ["task_id"],
+      required: ["task_id", "user_open_id"],
     },
   },
   {
@@ -72,9 +77,14 @@ export const taskToolDefs = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
         page_size: { type: "number", description: "Max tasks to return (default 50)" },
         completed: { type: "boolean", description: "If set, filter completed (true) or incomplete (false) tasks" },
       },
+      required: ["user_open_id"],
     },
   },
   {
@@ -84,8 +94,12 @@ export const taskToolDefs = [
       type: "object" as const,
       properties: {
         task_id: { type: "string", description: "Task GUID to complete" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
       },
-      required: ["task_id"],
+      required: ["task_id", "user_open_id"],
     },
   },
   {
@@ -95,8 +109,12 @@ export const taskToolDefs = [
       type: "object" as const,
       properties: {
         name: { type: "string", description: "Tasklist name" },
+        user_open_id: {
+          type: "string",
+          description: "Requesting user's open_id, used for user identity access",
+        },
       },
-      required: ["name"],
+      required: ["name", "user_open_id"],
     },
   },
 ];
@@ -104,6 +122,7 @@ export const taskToolDefs = [
 export async function handleTaskTool(
   name: string,
   args: Record<string, unknown>,
+  larkOptions?: LarkRequestOptions,
 ): Promise<ToolResult> {
   switch (name) {
     case "task_create": {
@@ -114,8 +133,10 @@ export async function handleTaskTool(
 
       // Merge creator as assignee if provided and not already in members
       const allMembers = [...(members || [])];
-      const creatorId = args.creator_open_id as string | undefined;
-      if (creatorId && !allMembers.some((m) => m.id === creatorId)) {
+      const creatorId =
+        (args.user_open_id as string | undefined) ||
+        (args.creator_open_id as string | undefined);
+      if (creatorId && !larkOptions && !allMembers.some((m) => m.id === creatorId)) {
         allMembers.push({ id: creatorId, id_type: "open_id", role: "assignee" });
       }
 
@@ -136,7 +157,7 @@ export async function handleTaskTool(
           },
         },
         params: { user_id_type: "open_id" },
-      });
+      }, larkOptions);
 
       const taskId = res.data?.task?.guid;
 
@@ -145,7 +166,7 @@ export async function handleTaskTool(
         await larkClient.task.v2.task.addTasklist({
           path: { task_guid: taskId },
           data: { tasklist_guid: args.tasklist_id as string },
-        });
+        }, larkOptions);
       }
 
       return {
@@ -183,7 +204,7 @@ export async function handleTaskTool(
           task: updateData as any,
           update_fields: updateFields,
         },
-      });
+      }, larkOptions);
       return {
         content: [
           { type: "text", text: `Task ${args.task_id} updated: ${updateFields.join(", ")}` },
@@ -198,7 +219,7 @@ export async function handleTaskTool(
           completed: args.completed as boolean | undefined,
           user_id_type: "open_id",
         },
-      });
+      }, larkOptions);
       const tasks = (res.data?.items ?? []).map((t) => ({
         guid: t.guid,
         summary: t.summary,
@@ -218,7 +239,7 @@ export async function handleTaskTool(
           task: { completed_at: String(Math.floor(Date.now() / 1000)) } as any,
           update_fields: ["completed_at"],
         },
-      });
+      }, larkOptions);
       return {
         content: [
           { type: "text", text: `Task ${args.task_id} marked as completed.` },
@@ -229,7 +250,7 @@ export async function handleTaskTool(
     case "tasklist_create": {
       const res = await larkClient.task.v2.tasklist.create({
         data: { name: args.name as string },
-      });
+      }, larkOptions);
       return {
         content: [
           {

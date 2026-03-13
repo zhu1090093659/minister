@@ -114,3 +114,43 @@ export function buildErrorCard(error: string): string {
     headerColor: "red",
   });
 }
+
+export function buildAuthCard(authUrl: string): string {
+  return JSON.stringify({
+    config: { wide_screen_mode: true },
+    header: {
+      title: { tag: "plain_text", content: "启用用户身份" },
+      template: "orange",
+    },
+    elements: [
+      {
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content:
+            "为了让文档、日程、任务和表格以**你的身份**创建，请先完成一次授权。授权后，后续相关操作会自动使用你的账号。",
+        },
+      },
+      {
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "立即授权" },
+            type: "primary",
+            url: authUrl,
+          },
+        ],
+      },
+      {
+        tag: "note",
+        elements: [
+          {
+            tag: "plain_text",
+            content: "未授权前，系统会继续使用应用身份执行本次请求。",
+          },
+        ],
+      },
+    ],
+  });
+}
